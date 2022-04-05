@@ -1,0 +1,10 @@
+New version 1.0.0 is available
+
+Changes have been made in this version:
+
+- Removed several errors in loading modules
+- Fixed errors with the material
+- Added some content
+- Fixed bugs in the language loader
+
+Well, and so on the little things)
