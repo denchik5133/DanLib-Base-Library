@@ -1,4 +1,4 @@
-                                                      New version 0.0.6 is available
+                                                                New version 0.0.6 is available
 
 Changes have been made in this version:
 
