@@ -14,7 +14,6 @@ There is a correction on the interface settings
 New version 0.0.6 is available
 
 Changes have been made in this version:
-
 - Removed several errors in loading modules
 - Fixed errors with the material
 - Added some content
