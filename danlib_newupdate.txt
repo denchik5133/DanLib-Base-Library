@@ -1,3 +1,15 @@
+Version 0.0.6
+
+Minor fixes:
+- Fixed a bug when enabling modules
+- Fixed bugs with languages
+
+There is a correction on the interface settings
+
+
+
+
+
    New version 0.0.6 is available
 
 Changes have been made in this version:
@@ -8,18 +20,3 @@ Changes have been made in this version:
 - Fixed bugs in the language loader
 
 Well, and so on the little things)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Simple Testings
