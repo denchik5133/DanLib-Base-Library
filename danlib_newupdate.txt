@@ -1,4 +1,4 @@
-   Version 0.0.6
+Version 0.0.6
 
 Minor fixes:
 - Fixed a bug when enabling modules
@@ -10,7 +10,8 @@ There is a correction on the interface settings
 
 
 
-   New version 0.0.6 is available
+
+New version 0.0.6 is available
 
 Changes have been made in this version:
 
