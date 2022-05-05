@@ -6,7 +6,8 @@
 			"moduledescription": "It's just not a big test via json",
 			"modulecolor": "Color( 255, 140, 0 )",
 			"moduleicon": "materials/danlib/other/search.png",
-			"modulelink": ""
+			"modulelink": "",
+			"moduleauthor": "denchik"
 		},
 		{
 			"categorie": "testing2",
@@ -14,7 +15,8 @@
 			"moduledescription": "It's just not a big test via json",
 			"modulecolor": "Color( 255, 140, 0 )",
 			"moduleicon": "materials/danlib/other/search.png",
-			"modulelink": ""
+			"modulelink": "",
+			"moduleauthor": ""
 		}
 	]
 }
