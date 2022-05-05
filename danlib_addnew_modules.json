@@ -4,7 +4,7 @@
 			"categorie": "testing1",
 			"modulename": "Testing1",
 			"moduledescription": "It's just not a big test via json",
-			"modulecolor": "#FF8C00",
+			"modulecolor": "255, 140, 0",
 			"moduleicon": "materials/danlib/other/search.png",
 			"modulelink": ""
 		},
@@ -12,7 +12,7 @@
 			"categorie": "testing2",
 			"modulename": "Testing2",
 			"moduledescription": "It's just not a big test via json",
-			"modulecolor": "#FF8C00",
+			"modulecolor": "255, 140, 0",
 			"moduleicon": "materials/danlib/other/search.png",
 			"modulelink": ""
 		}
