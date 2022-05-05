@@ -1,12 +1,20 @@
 {
 	"modules": [
 		{
-			"name": "ad",
-			"unicode": "f641"
+			"categorie": "testing1",
+			"modulename": "Testing1",
+			"moduledescription": "It's just not a big test via json",
+			"modulecolor": "#FF8C00",
+			"moduleicon": "materials/danlib/other/search.png",
+			"modulelink": ""
 		},
 		{
-			"name": "address-book",
-			"unicode": "f2b9"
-		},
+			"categorie": "testing2",
+			"modulename": "Testing2",
+			"moduledescription": "It's just not a big test via json",
+			"modulecolor": "#FF8C00",
+			"moduleicon": "materials/danlib/other/search.png",
+			"modulelink": ""
+		}
 	]
 }
