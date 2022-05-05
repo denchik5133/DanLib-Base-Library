@@ -1,7 +1,7 @@
 {
 	"newmodules": [
 		{
-			"categorie": "testing1",
+			"modulecategory": "testing1",
 			"modulename": "Testing1",
 			"moduledescription": "It's just not a big test via json",
 			"modulecolor": "Color( 255, 140, 0 )",
@@ -10,7 +10,7 @@
 			"moduleauthor": "denchik"
 		},
 		{
-			"categorie": "testing2",
+			"modulecategory": "testing2",
 			"modulename": "Testing2",
 			"moduledescription": "It's just not a big test via json",
 			"modulecolor": "Color( 255, 140, 0 )",
