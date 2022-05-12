@@ -1,22 +1,31 @@
 {
 	"newmodules": [
 		{
-			"modulecategory": "testing1",
-			"modulename": "Testing1",
-			"moduledescription": "It's just not a big test via json",
+			"modulecategory": "codesystem",
+			"modulename": "Code System",
+			"moduledescription": "The code system, is well suited for Roleplay and for those servers who want to plunge into role-playing progress.",
 			"modulecolor": "Color( 255, 140, 0 )",
-			"moduleicon": "materials/danlib/other/search.png",
-			"modulelink": "",
+			"moduleicon": "",
+			"modulelink": "https://discord.gg/CND6B5sH3j",
 			"moduleauthor": "denchik"
 		},
 		{
-			"modulecategory": "testing2",
-			"modulename": "Testing2",
-			"moduledescription": "It's just not a big test via json",
+			"modulecategory": "escmenu",
+			"modulename": "Simple Esc Menu",
+			"moduledescription": "A good-looking Esc Menu.",
 			"modulecolor": "Color( 255, 140, 0 )",
-			"moduleicon": "materials/danlib/other/search.png",
-			"modulelink": "",
-			"moduleauthor": ""
+			"moduleicon": "",
+			"modulelink": "https://discord.gg/CND6B5sH3j",
+			"moduleauthor": "denchik"
+		},
+		{
+			"modulecategory": "discordlogs",
+			"modulename": "Discord Logs",
+			"moduledescription": "Discord Logs will facilitate the work of the server Administration. Help better monitor and record the violations of the server, through Discord.",
+			"modulecolor": "Color( 255, 140, 0 )",
+			"moduleicon": "",
+			"modulelink": "https://discord.gg/CND6B5sH3j",
+			"moduleauthor": "denchik"
 		}
 	]
 }
