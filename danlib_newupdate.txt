@@ -1,3 +1,10 @@
+What's new?
+- Bug fixes
+- Removed unnecessary code
+- Updated interface in the base menu
+
+
+
 Version 0.0.6
 
 Minor fixes:
@@ -5,9 +12,6 @@ Minor fixes:
 - Fixed bugs with languages
 
 There is a correction on the interface settings
-
-
-
 
 
 
