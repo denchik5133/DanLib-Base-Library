@@ -28,12 +28,12 @@
 			"moduleauthor": "denchik"
 		},
 		{
-			"modulecategory": "123", // Testing the Category
-			"modulename": "123", // Testing the Name
+			"modulecategory": "123",
+			"modulename": "123",
 			"moduledescription": "Discord Logs will facilitate the work of the server Administration. Help better monitor and record the violations of the server, through Discord.", // Testing the description
-			"modulecolor": "Color( 255, 140, 0 )", // Testing the color
-			"moduleicon": "materials/danlib/other/delete.png", // Testing the icon
-			"modulelink": "https://discord.gg/CND6B5sH3j", // Testing the links
+			"modulecolor": "Color( 255, 140, 0 )",
+			"moduleicon": "materials/danlib/other/delete.png",
+			"modulelink": "https://discord.gg/CND6B5sH3j",
 			"moduleauthor": "denchik" 
 		}
 	]
