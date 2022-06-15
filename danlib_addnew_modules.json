@@ -5,7 +5,6 @@
 			"modulename": "Code System",
 			"moduledescription": "The code system, is well suited for Roleplay and for those servers who want to plunge into role-playing progress.",
 			"modulecolor": "Color( 255, 140, 0 )",
-			"moduleicon": "materials/danlib/other/delete.png",
 			"modulelink": "https://discord.gg/CND6B5sH3j",
 			"moduleauthor": "denchik"
 		},
@@ -14,7 +13,6 @@
 			"modulename": "Simple Esc Menu",
 			"moduledescription": "A good-looking Esc Menu.",
 			"modulecolor": "Color( 255, 140, 0 )",
-			"moduleicon": "materials/danlib/other/delete.png",
 			"modulelink": "https://discord.gg/CND6B5sH3j",
 			"moduleauthor": "denchik"
 		},
@@ -23,7 +21,6 @@
 			"modulename": "Discord Logs",
 			"moduledescription": "Discord Logs will facilitate the work of the server Administration. Help better monitor and record the violations of the server, through Discord.",
 			"modulecolor": "Color( 255, 140, 0 )",
-			"moduleicon": "materials/danlib/other/delete.png",
 			"modulelink": "https://discord.gg/CND6B5sH3j",
 			"moduleauthor": "denchik"
 		},
@@ -32,7 +29,6 @@
 			"modulename": "123",
 			"moduledescription": "Discord Logs will facilitate the work of the server Administration. Help better monitor and record the violations of the server, through Discord.", // Testing the description
 			"modulecolor": "Color( 255, 140, 0 )",
-			"moduleicon": "materials/danlib/other/delete.png",
 			"modulelink": "https://discord.gg/CND6B5sH3j",
 			"moduleauthor": "denchik" 
 		}
