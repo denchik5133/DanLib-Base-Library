@@ -26,6 +26,15 @@
 			"moduleicon": "",
 			"modulelink": "https://discord.gg/CND6B5sH3j",
 			"moduleauthor": "denchik"
+		},
+		{
+			"modulecategory": "123",
+			"modulename": "123",
+			"moduledescription": "Discord Logs will facilitate the work of the server Administration. Help better monitor and record the violations of the server, through Discord.",
+			"modulecolor": "Color( 255, 140, 0 )",
+			"moduleicon": "",
+			"modulelink": "https://discord.gg/CND6B5sH3j",
+			"moduleauthor": "denchik"
 		}
 	]
 }
