@@ -6,7 +6,8 @@
 			"moduledescription": "The code system, is well suited for Roleplay and for those servers who want to plunge into role-playing progress.",
 			"modulecolor": "Color( 255, 140, 0 )",
 			"modulelink": "https://discord.gg/CND6B5sH3j",
-			"moduleauthor": "denchik"
+			"moduleauthor": "denchik",
+			"moduleoption": "codesystem"
 		},
 		{
 			"modulecategory": "escmenu",
@@ -14,7 +15,8 @@
 			"moduledescription": "A good-looking Esc Menu.",
 			"modulecolor": "Color( 255, 140, 0 )",
 			"modulelink": "https://discord.gg/CND6B5sH3j",
-			"moduleauthor": "denchik"
+			"moduleauthor": "denchik",
+			"moduleoption": "escmenu"
 		},
 		{
 			"modulecategory": "discordlogs",
@@ -22,7 +24,8 @@
 			"moduledescription": "Discord Logs will facilitate the work of the server Administration. Help better monitor and record the violations of the server, through Discord.",
 			"modulecolor": "Color( 255, 140, 0 )",
 			"modulelink": "https://discord.gg/CND6B5sH3j",
-			"moduleauthor": "denchik"
+			"moduleauthor": "denchik",
+			"moduleoption": "discordlogs"
 		},
 		{
 			"modulecategory": "danlib_ammunition",
@@ -30,7 +33,8 @@
 			"moduledescription": "Testings",
 			"modulecolor": "Color( 255, 140, 0 )",
 			"modulelink": "https://discord.gg/CND6B5sH3j",
-			"moduleauthor": "denchik" 
+			"moduleauthor": "denchik",
+			"moduleoption": "danlib_ammunition"
 		},
 		{
 			"modulecategory": "inventory",
@@ -38,7 +42,8 @@
 			"moduledescription": "This is a simple inventory with a simple interface that is under development, and it is not a fact that there will be no errors. Suitable for DarkRP mode.",
 			"modulecolor": "Color( 255, 140, 0 )",
 			"modulelink": "https://steamcommunity.com/sharedfiles/filedetails/?id=2751790452",
-			"moduleauthor": "denchik"
+			"moduleauthor": "denchik",
+			"moduleoption": "inventory"
 		},
 		{
 			"modulecategory": "lfs_travel_system",
@@ -46,7 +51,8 @@
 			"moduledescription": "A LFS Travel System is designed to move between locations on the map. It is well suited for RolePlay wagering.",
 			"modulecolor": "Color( 255, 140, 0 )",
 			"modulelink": "https://steamcommunity.com/sharedfiles/filedetails/?id=2651641207",
-			"moduleauthor": "denchik"
+			"moduleauthor": "denchik",
+			"moduleoption": "lfs_travel_system"
 		},
 		{
 			"modulecategory": "simplescoreboard",
@@ -54,7 +60,8 @@
 			"moduledescription": "A simple scoreboard for your server.",
 			"modulecolor": "Color( 255, 140, 0 )",
 			"modulelink": "https://steamcommunity.com/sharedfiles/filedetails/?id=2577420495",
-			"moduleauthor": "denchik"
+			"moduleauthor": "denchik",
+			"moduleoption": "simplescoreboard"
 		},
 	]
 }
