@@ -44,6 +44,33 @@
 			"modulelink": "https://steamcommunity.com/sharedfiles/filedetails/?id=2577420495",
 			"moduleauthor": "denchik",
 			"moduleoption": "simplescoreboard"
+		},
+		{
+			"modulecategory": "lfs_travel_system",
+			"modulename": "LFS Travel System",
+			"moduledescription": "A LFS Travel System is designed to move between locations on the map. It is well suited for RolePlay wagering.",
+			"modulecolor": "Color( 255, 140, 0 )",
+			"modulelink": "https://steamcommunity.com/sharedfiles/filedetails/?id=2651641207",
+			"moduleauthor": "denchik",
+			"moduleoption": "lfs_travel_system"
+		},
+		{
+			"modulecategory": "inventory",
+			"modulename": "Inventory",
+			"moduledescription": "This is a simple inventory with a simple interface that is under development, and it is not a fact that there will be no errors. Suitable for DarkRP mode.",
+			"modulecolor": "Color( 255, 140, 0 )",
+			"modulelink": "https://steamcommunity.com/sharedfiles/filedetails/?id=2751790452",
+			"moduleauthor": "denchik",
+			"moduleoption": "inventory"
+		},
+		{
+			"modulecategory": "contextmenu",
+			"modulename": "Context Menu",
+			"moduledescription": "123123123",
+			"modulecolor": "Color( 255, 140, 0 )",
+			"modulelink": "https://discord.gg/CND6B5sH3j",
+			"moduleauthor": "denchik",
+			"moduleoption": "contextmenu"
 		}
 	]
 }
