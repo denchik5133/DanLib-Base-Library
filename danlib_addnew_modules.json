@@ -35,6 +35,15 @@
 			"modulelink": "https://discord.gg/CND6B5sH3j",
 			"moduleauthor": "denchik",
 			"moduleoption": "danlib_ammunition"
+		},
+		{
+			"modulecategory": "simplescoreboard",
+			"modulename": "Simple Scoreboard",
+			"moduledescription": "A simple scoreboard for your server.",
+			"modulecolor": "Color( 255, 140, 0 )",
+			"modulelink": "https://steamcommunity.com/sharedfiles/filedetails/?id=2577420495",
+			"moduleauthor": "denchik",
+			"moduleoption": "simplescoreboard"
 		}
 	]
 }
