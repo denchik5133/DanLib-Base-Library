@@ -35,33 +35,6 @@
 			"modulelink": "https://discord.gg/CND6B5sH3j",
 			"moduleauthor": "denchik",
 			"moduleoption": "danlib_ammunition"
-		},
-		{
-			"modulecategory": "inventory",
-			"modulename": "Inventory",
-			"moduledescription": "This is a simple inventory with a simple interface that is under development, and it is not a fact that there will be no errors. Suitable for DarkRP mode.",
-			"modulecolor": "Color( 255, 140, 0 )",
-			"modulelink": "https://steamcommunity.com/sharedfiles/filedetails/?id=2751790452",
-			"moduleauthor": "denchik",
-			"moduleoption": "inventory"
-		},
-		{
-			"modulecategory": "lfs_travel_system",
-			"modulename": "LFS Travel System",
-			"moduledescription": "A LFS Travel System is designed to move between locations on the map. It is well suited for RolePlay wagering.",
-			"modulecolor": "Color( 255, 140, 0 )",
-			"modulelink": "https://steamcommunity.com/sharedfiles/filedetails/?id=2651641207",
-			"moduleauthor": "denchik",
-			"moduleoption": "lfs_travel_system"
-		},
-		{
-			"modulecategory": "simplescoreboard",
-			"modulename": "Simple Scoreboard",
-			"moduledescription": "A simple scoreboard for your server.",
-			"modulecolor": "Color( 255, 140, 0 )",
-			"modulelink": "https://steamcommunity.com/sharedfiles/filedetails/?id=2577420495",
-			"moduleauthor": "denchik",
-			"moduleoption": "simplescoreboard"
-		},
+		}
 	]
 }
