@@ -1,0 +1,102 @@
+{
+    "newnews": [
+        {
+            "news_title": "An update for Garry's Mod is coming out!", // News title
+            "news_description": "On June 24, at the usual time of 4pm GMT, an update will be released that will be optional for server owners. The update will include a pre-release branch, that is, the next version of Garry's Mod, which contains all the changes in the next updates to the game.", // News summary.
+            "importance_score": "", // Importance Assessment. It is used to show how important a particular news item is. Material.
+            "importance_score_color": "Color( 255, 140, 0 )", // The color of the importance score. Red/blue/yellow
+            "news_link": "https://discord.gg/CND6B5sH3j", // Link to the news, if any.
+        },
+        {
+            "news_title": "An update for Garry's Mod is coming out!", // News title
+            "news_description": "On June 24, at the usual time of 4pm GMT, an update will be released that will be optional for server owners. The update will include a pre-release branch, that is, the next version of Garry's Mod, which contains all the changes in the next updates to the game.", // News summary.
+            "importance_score": "", // Importance Assessment. It is used to show how important a particular news item is. Material.
+            "importance_score_color": "Color( 255, 140, 0 )", // The color of the importance score. Red/blue/yellow
+            "news_link": "https://discord.gg/CND6B5sH3j", // Link to the news, if any.
+        },
+        {
+            "news_title": "An update for Garry's Mod is coming out!", // News title
+            "news_description": "On June 24, at the usual time of 4pm GMT, an update will be released that will be optional for server owners. The update will include a pre-release branch, that is, the next version of Garry's Mod, which contains all the changes in the next updates to the game.", // News summary.
+            "importance_score": "", // Importance Assessment. It is used to show how important a particular news item is. Material.
+            "importance_score_color": "Color( 255, 140, 0 )", // The color of the importance score. Red/blue/yellow
+            "news_link": "https://discord.gg/CND6B5sH3j", // Link to the news, if any.
+        },
+        {
+            "news_title": "An update for Garry's Mod is coming out!", // News title
+            "news_description": "On June 24, at the usual time of 4pm GMT, an update will be released that will be optional for server owners. The update will include a pre-release branch, that is, the next version of Garry's Mod, which contains all the changes in the next updates to the game.", // News summary.
+            "importance_score": "", // Importance Assessment. It is used to show how important a particular news item is. Material.
+            "importance_score_color": "Color( 255, 140, 0 )", // The color of the importance score. Red/blue/yellow
+            "news_link": "https://discord.gg/CND6B5sH3j", // Link to the news, if any.
+        },
+        {
+            "news_title": "An update for Garry's Mod is coming out!", // News title
+            "news_description": "On June 24, at the usual time of 4pm GMT, an update will be released that will be optional for server owners. The update will include a pre-release branch, that is, the next version of Garry's Mod, which contains all the changes in the next updates to the game.", // News summary.
+            "importance_score": "", // Importance Assessment. It is used to show how important a particular news item is. Material.
+            "importance_score_color": "Color( 255, 140, 0 )", // The color of the importance score. Red/blue/yellow
+            "news_link": "https://discord.gg/CND6B5sH3j", // Link to the news, if any.
+        }
+    ],
+    "newmodules": [
+        {
+            "modulename": "Code System", // Module name
+            "moduledescription": "The code system, is well suited for Roleplay and for those servers who want to plunge into role-playing progress.", // Module description
+            "modulecolor": "Color( 255, 140, 0 )", // Module color
+            "modulelink": "https://discord.gg/CND6B5sH3j", // Link to module
+            "moduleauthor": "denchik", // Author of the Module
+        },
+        {
+            "modulename": "Simple Esc Menu", // Module name
+            "moduledescription": "A good-looking Esc Menu.", // Module description
+            "modulecolor": "Color( 255, 140, 0 )", // Module color
+            "modulelink": "https://discord.gg/CND6B5sH3j", // Link to module
+            "moduleauthor": "denchik", // Author of the Module
+        },
+        {
+            "modulename": "Discord Logs", // Module name
+            "moduledescription": "Discord Logs will facilitate the work of the server Administration. Help better monitor and record the violations of the server, through Discord.", // Module description
+            "modulecolor": "Color( 255, 140, 0 )", // Module color
+            "modulelink": "https://discord.gg/CND6B5sH3j", // Link to module
+            "moduleauthor": "denchik", // Author of the Module
+        },
+        {
+            "modulename": "Weapon cabinet", // Module name
+            "moduledescription": "Testings", // Module description
+            "modulecolor": "Color( 255, 140, 0 )", // Module color
+            "modulelink": "https://discord.gg/CND6B5sH3j", // Link to module
+            "moduleauthor": "denchik", // Author of the Module
+        },
+        {
+            "modulename": "Simple Scoreboard", // Module name
+            "moduledescription": "A simple scoreboard for your server.", // Module description
+            "modulecolor": "Color( 255, 140, 0 )", // Module color
+            "modulelink": "https://steamcommunity.com/sharedfiles/filedetails/?id=2577420495", // Link to module
+            "moduleauthor": "denchik", // Author of the Module
+        },
+        {
+            "modulename": "LFS Travel System", // Module name
+            "moduledescription": "A LFS Travel System is designed to move between locations on the map. It is well suited for RolePlay wagering.", // Module description
+            "modulecolor": "Color( 255, 140, 0 )", // Module color
+            "modulelink": "https://steamcommunity.com/sharedfiles/filedetails/?id=2651641207", // Link to module
+            "moduleauthor": "denchik", // Author of the Module
+        },
+        {
+            "modulename": "Inventory", // Module name
+            "moduledescription": "This is a simple inventory with a simple interface that is under development, and it is not a fact that there will be no errors. Suitable for DarkRP mode.", // Module description
+            "modulecolor": "Color( 255, 140, 0 )", // Module color
+            "modulelink": "https://steamcommunity.com/sharedfiles/filedetails/?id=2751790452", // Link to module
+            "moduleauthor": "denchik", // Author of the Module
+        }
+    ],
+    "newupdates": [
+        {
+            "update_name": "An update for Garry's Mod is coming out!", // Name of update
+            "update_description": "On June 24, at the usual time of 4pm GMT, an update will be released that will be optional for server owners. The update will include a pre-release branch, that is, the next version of Garry's Mod, which contains all the changes in the next updates to the game.", // Update Description.
+            "update_link": "https://discord.gg/CND6B5sH3j", // Link to update, if available.
+        },
+        {
+            "update_name": "An update for Garry's Mod is coming out!", // News title
+            "update_description": "On June 24, at the usual time of 4pm GMT, an update will be released that will be optional for server owners. The update will include a pre-release branch, that is, the next version of Garry's Mod, which contains all the changes in the next updates to the game.", // Update Description.
+            "update_link": "https://discord.gg/CND6B5sH3j", // Link to update, if available.
+        }
+    ]
+}
