@@ -4,6 +4,7 @@ The following changes have been made in this version:
 - 100% translated languages (English and Russian)
 - Updated interface
 - Fixed errors with module settings
+- Sorted news/modules/updates in the info tab
 
 
 What's new?
