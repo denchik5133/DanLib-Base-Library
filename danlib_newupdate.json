@@ -13,6 +13,13 @@
             "importance_score": "",
             "importance_score_color": "Color( 255, 140, 0 )",
             "news_link": "https://discord.gg/CND6B5sH3j"
+        },
+        {
+            "news_title": "An update for Garry's Mod is coming out!",
+            "news_description": "On June 24, at the usual time of 4pm GMT, an update will be released that will be optional for server owners. The update will include a pre-release branch, that is, the next version of Garry's Mod, which contains all the changes in the next updates to the game.",
+            "importance_score": "",
+            "importance_score_color": "Color( 255, 140, 0 )",
+            "news_link": "https://discord.gg/CND6B5sH3j"
         }
     ],
     "newmodules": [
