@@ -13,27 +13,6 @@
             "importance_score": "",
             "importance_score_color": "Color( 255, 140, 0 )",
             "news_link": "https://discord.gg/CND6B5sH3j"
-        },
-        {
-            "news_title": "An update for Garry's Mod is coming out!",
-            "news_description": "On June 24, at the usual time of 4pm GMT, an update will be released that will be optional for server owners. The update will include a pre-release branch, that is, the next version of Garry's Mod, which contains all the changes in the next updates to the game.",
-            "importance_score": "",
-            "importance_score_color": "Color( 255, 140, 0 )",
-            "news_link": "https://discord.gg/CND6B5sH3j"
-        },
-        {
-            "news_title": "An update for Garry's Mod is coming out!",
-            "news_description": "On June 24, at the usual time of 4pm GMT, an update will be released that will be optional for server owners. The update will include a pre-release branch, that is, the next version of Garry's Mod, which contains all the changes in the next updates to the game.",
-            "importance_score": "",
-            "importance_score_color": "Color( 255, 140, 0 )",
-            "news_link": "https://discord.gg/CND6B5sH3j"
-        },
-        {
-            "news_title": "An update for Garry's Mod is coming out!",
-            "news_description": "On June 24, at the usual time of 4pm GMT, an update will be released that will be optional for server owners. The update will include a pre-release branch, that is, the next version of Garry's Mod, which contains all the changes in the next updates to the game.",
-            "importance_score": "",
-            "importance_score_color": "Color( 255, 140, 0 )",
-            "news_link": "https://discord.gg/CND6B5sH3j"
         }
     ],
     "newmodules": [
@@ -49,41 +28,6 @@
             "moduledescription": "A good-looking Esc Menu.",
             "modulecolor": "Color( 255, 140, 0 )",
             "modulelink": "https://discord.gg/CND6B5sH3j",
-            "moduleauthor": "denchik"
-        },
-        {
-            "modulename": "Discord Logs",
-            "moduledescription": "Discord Logs will facilitate the work of the server Administration. Help better monitor and record the violations of the server, through Discord.",
-            "modulecolor": "Color( 255, 140, 0 )",
-            "modulelink": "https://discord.gg/CND6B5sH3j",
-            "moduleauthor": "denchik"
-        },
-        {
-            "modulename": "Weapon cabinet",
-            "moduledescription": "Testings",
-            "modulecolor": "Color( 255, 140, 0 )",
-            "modulelink": "https://discord.gg/CND6B5sH3j",
-            "moduleauthor": "denchik"
-        },
-        {
-            "modulename": "Simple Scoreboard",
-            "moduledescription": "A simple scoreboard for your server.",
-            "modulecolor": "Color( 255, 140, 0 )",
-            "modulelink": "https://steamcommunity.com/sharedfiles/filedetails/?id=2577420495",
-            "moduleauthor": "denchik"
-        },
-        {
-            "modulename": "LFS Travel System",
-            "moduledescription": "A LFS Travel System is designed to move between locations on the map. It is well suited for RolePlay wagering.",
-            "modulecolor": "Color( 255, 140, 0 )",
-            "modulelink": "https://steamcommunity.com/sharedfiles/filedetails/?id=2651641207",
-            "moduleauthor": "denchik"
-        },
-        {
-            "modulename": "Inventory",
-            "moduledescription": "This is a simple inventory with a simple interface that is under development, and it is not a fact that there will be no errors. Suitable for DarkRP mode.",
-            "modulecolor": "Color( 255, 140, 0 )",
-            "modulelink": "https://steamcommunity.com/sharedfiles/filedetails/?id=2751790452",
             "moduleauthor": "denchik"
         }
     ],
