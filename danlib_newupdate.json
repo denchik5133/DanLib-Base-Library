@@ -1,8 +1,8 @@
 {
     "newnews": [
         {
-            "news_title": "An update for Garry's Mod is coming out!",
-            "news_description": "On June 24, at the usual time of 4pm GMT, an update will be released that will be optional for server owners. The update will include a pre-release branch, that is, the next version of Garry's Mod, which contains all the changes in the next updates to the game.",
+            "news_title": "=== The new version 0.0.7 is available ===",
+            "news_description": "The following changes have been made in this version: \n- Fixed several errors when loading the library \n- 100% translated languages (English and Russian) \n- Updated interface \n- Fixed errors with module settings \n- Sorted news/modules/updates in the info tab",
             "importance_score": "",
             "importance_score_color": "Color( 255, 140, 0 )",
             "news_link": "https://discord.gg/CND6B5sH3j",
@@ -25,8 +25,8 @@
             "showhide": true
         },
         {
-            "news_title": "An update for Garry's Mod is coming out!",
-            "news_description": "On June 24, at the usual time of 4pm GMT, an update will be released that will be optional for server owners. The update will include a pre-release branch, that is, the next version of Garry's Mod, which contains all the changes in the next updates to the game.",
+            "news_title": "=== New version 0.0.6 is available ===",
+            "news_description": "Changes have been made in this version: \n- Removed several errors in loading modules \n- Fixed errors with the material \n- Added some content \n- Fixed bugs in the language loader",
             "importance_score": "",
             "importance_score_color": "Color( 255, 140, 0 )",
             "news_link": "https://discord.gg/CND6B5sH3j",
