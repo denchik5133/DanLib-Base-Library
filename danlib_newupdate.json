@@ -3,32 +3,32 @@
         {
             "news_title": "=== The new version 0.0.7 is available ===",
             "news_description": "The following changes have been made in this version: \n- Fixed several errors when loading the library \n- 100% translated languages (English and Russian) \n- Updated interface \n- Fixed errors with module settings \n- Sorted news/modules/updates in the info tab",
-            "importance_score": "",
-            "importance_score_color": "Color( 255, 140, 0 )",
+            "news_priority": "High",
+            "news_priority_color": "Color( 255, 140, 0 )",
             "news_link": "https://discord.gg/CND6B5sH3j",
             "showhide": true
         },
         {
             "news_title": "What's new?",
             "news_description": "- Bug fixes \n- Removed unnecessary code \n- Updated interface in the base menu",
-            "importance_score": "",
-            "importance_score_color": "Color( 255, 140, 0 )",
+            "news_priority": "Low",
+            "news_priority_color": "Color( 255, 140, 0 )",
             "news_link": "https://discord.gg/CND6B5sH3j",
             "showhide": true
         },
         {
             "news_title": "=== Version 0.0.6 ===",
             "news_description": "Minor fixes: \n- Fixed a bug when enabling modules \n- Fixed bugs with languages \n- There is a correction on the interface settings",
-            "importance_score": "",
-            "importance_score_color": "Color( 255, 140, 0 )",
+            "news_priority": "Low",
+            "news_priority_color": "Color( 255, 140, 0 )",
             "news_link": "https://discord.gg/CND6B5sH3j",
             "showhide": true
         },
         {
             "news_title": "=== New version 0.0.6 is available ===",
             "news_description": "Changes have been made in this version: \n- Removed several errors in loading modules \n- Fixed errors with the material \n- Added some content \n- Fixed bugs in the language loader",
-            "importance_score": "",
-            "importance_score_color": "Color( 255, 140, 0 )",
+            "news_priority": "Medium",
+            "news_priority_color": "Color( 255, 140, 0 )",
             "news_link": "https://discord.gg/CND6B5sH3j",
             "showhide": true
         }
