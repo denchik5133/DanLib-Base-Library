@@ -6,6 +6,7 @@
             "news_priority": "High",
             "news_priority_color": "Color( 255, 140, 0 )",
             "news_link": "https://discord.gg/CND6B5sH3j",
+            "spoiler": true,
             "showhide": true
         },
         {
