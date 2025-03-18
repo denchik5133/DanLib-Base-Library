@@ -50,10 +50,10 @@ networkUtil:AddString('DanLib:SidePopupNotification')
 -- @param time: Duration for which the notification will be displayed (in seconds).
 function base:CreatePopupNotifi(pPlayer, title, message, msgType, time)
     network:Start('DanLib:ScreenNotification')
-    network:WriteString(title)
-    network:WriteString(message)
-    network:WriteString(msgType)
-    network:WriteString(time)
+    network:WriteString(title or '')
+    network:WriteString(message or '')
+    network:WriteString(msgType or 'ERROR')
+    network:WriteString(time or 5)
     network:SendToPlayer(pPlayer)
 end
 
