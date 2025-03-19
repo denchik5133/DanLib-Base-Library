@@ -18,7 +18,7 @@
 
 
 local base = DanLib.Func
-local customUtils = DanLib.CustomUtils
+local customUtils = DanLib.CustomUtils.Create
 
 local PlaySound = surface.PlaySound
 local isValid = IsValid
@@ -31,7 +31,7 @@ local max = math.max
 function base:CreateLabel(parent, text, font, TextColor)
     font = font or 'danlib_font_18'
 
-    local PANEL = customUtils.Create(parent, 'DLabel')
+    local PANEL = customUtils(parent, 'DLabel')
     PANEL:SetTextColor(TextColor or base:Theme('title'))
     PANEL:SetFont(font)
     PANEL:SetText(text or '')
@@ -67,7 +67,7 @@ end
 
 
 function base:CreateHTML(parent, url)
-    local html = customUtils.Create(parent, 'DHTML')
+    local html = customUtils(parent, 'DHTML')
 
     if url then
         html:SetScrollbars(false)
@@ -89,7 +89,7 @@ end
 -- @param radius: The radius for the rounded corners.
 -- @return PANEL: Returns the panel element that was created.
 function base:CreatePanel(parent, rounded, radius)
-    return customUtils.Create(parent)
+    return customUtils(parent)
 end
 
 
@@ -97,7 +97,7 @@ end
 -- @param parent Panel: The parent panel for the model.
 -- @return DModelPanel: The created model panel.
 function base:CreateModelPanel(parent)
-    local Panel = customUtils.Create(parent)
+    local Panel = customUtils(parent)
 
     --- Draws the background and frame around the model.
     Panel:ApplyEvent(nil, function(_, w, h)
@@ -105,11 +105,11 @@ function base:CreateModelPanel(parent)
         DanLib.Utils:DrawOutlinedRoundedRect(6, 0, 0, w, h, 4, base:Theme('frame'))
     end)
 
-    Panel:ApplyEvent('PaintOver', function(sl, w, h)
-        DanLib.Utils:DrawGradient(0, h - 50, w, 100, TOP, Color(93, 180, 255, 30))
-    end)
+    -- Panel:ApplyEvent('PaintOver', function(sl, w, h)
+    --     DanLib.Utils:DrawGradient(0, h - 50, w, 100, TOP, Color(93, 180, 255, 30))
+    -- end)
 
-    Panel.ModelPanel = customUtils.Create(Panel, 'DModelPanel')
+    Panel.ModelPanel = customUtils(Panel, 'DModelPanel')
     Panel.ModelPanel:Pin(FILL)
 
     --- Configuring the behaviour of the model during rendering.
@@ -182,16 +182,16 @@ end
 
 -- https://github.com/Facepunch/garrysmod/blob/master/garrysmod/lua/vgui/dadjustablemodelpanel.lua
 function base:CreateAdjustableModelPanel(parent)
-    local ModelPanel = customUtils.Create(parent, 'DModelPanel')
+    local ModelPanel = customUtils(parent, 'DModelPanel')
 
     AccessorFunc(ModelPanel, 'm_bFirstPerson', 'FirstPerson')
 
     ModelPanel.mx = 0
     ModelPanel.my = 0
     ModelPanel.aLookAngle = angle_zero
-    ModelPanel.vCamPos = Vector(0, 0, 0) -- Инициализация позиции камеры
-    ModelPanel.OrbitPoint = Vector(0, 0, 0) -- Инициализация точки орбиты
-    ModelPanel.OrbitDistance = 100 -- Начальное расстояние до модели
+    ModelPanel.vCamPos = Vector(0, 0, 0) -- Initializing the camera position
+    ModelPanel.OrbitPoint = Vector(0, 0, 0) -- Initializing the orbit point
+    ModelPanel.OrbitDistance = 100 -- Initial distance to the model
 
     function ModelPanel:OnMousePressed(mousecode)
         self:SetCursor('none')
@@ -294,7 +294,7 @@ end
 
 --- Copies text to the clipboard and displays a notification on the screen.
 -- @param CopyText (string): Text to be copied to the clipboard. If not specified, an empty string is used.
-function DanLib.Func:ClipboardText(CopyText)
+function base:ClipboardText(CopyText)
     CopyText = CopyText or ''
     local text = self:L('#copied.clipboard')
     local pos_x, pos_y = gui.MouseX(), gui.MouseY()
@@ -302,7 +302,7 @@ function DanLib.Func:ClipboardText(CopyText)
 
     SetClipboardText(CopyText)
 
-    local CLIP_BOARD_TEXT = customUtils.Create()
+    local CLIP_BOARD_TEXT = customUtils()
     CLIP_BOARD_TEXT:SetDrawOnTop(true)
     CLIP_BOARD_TEXT:ApplyAttenuation(0.2)
     CLIP_BOARD_TEXT:SetSize(text_x + 1, text_y + 1)
@@ -317,7 +317,7 @@ function DanLib.Func:ClipboardText(CopyText)
     -- PlaySound('ddi/error.mp3')
     self:PlaySound('error')
 
-    -- Удаляем панель через 0.4 секунды
+    -- Deleting the panel in 0.4 seconds
     self:TimerSimple(0.4, function()
        if isValid(CLIP_BOARD_TEXT) then
             CLIP_BOARD_TEXT:AlphaTo(0, 0.4, 0, function()
