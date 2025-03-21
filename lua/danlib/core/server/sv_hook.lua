@@ -118,29 +118,6 @@ function base:SendGlobalNotifi(text)
 end
 
 
---- Sends a message to players within the specified distance.
--- @param pPlayer: The player from whom the message originates.
--- @param type: Message type.
--- @param distance: Maximum distance to send the message.
--- @param message: Additional arguments for the message.
-function base:SendMessageDistance(pPlayer, type, distance, message) 
-    if (not IsValid(pPlayer)) then return end
-
-    local args = { message }
-    if (distance == 0) then
-        for _, v in pairs(player.GetAll()) do
-            self:SendMessage(v, type, unpack(args))
-        end
-    else
-        for _, v in ipairs(player.GetAll()) do
-            if IsValid(v) and v:GetPos():Distance(pPlayer:GetPos()) <= distance then
-                self:SendMessage(v, type, unpack(args))
-            end
-        end
-    end
-end
-
-
 --- Sends a private message to a player with the title.
 -- @param pPlayer: The player to whom the private message is sent.
 -- @param title: The title of the message.
