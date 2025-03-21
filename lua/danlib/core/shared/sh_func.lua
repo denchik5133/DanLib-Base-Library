@@ -121,7 +121,31 @@ function base:SendMessage(pPlayer, msgType, ...)
         network:WriteTable(args)
         network:SendToServer()
     end
-end  
+end
+
+
+--- Sends a message to players within the specified distance.
+-- @param pPlayer: The player from whom the message originates.
+-- @param type: Message type.
+-- @param distance: Maximum distance to send the message.
+-- @param ...: Additional arguments for the message.
+function base:SendMessageDistance(pPlayer, type, distance, ...) 
+    if (not IsValid(pPlayer)) then return end
+
+    local args = { ... }
+
+    if (distance == 0) then
+        for _, v in pairs(player.GetAll()) do
+            self:SendMessage(v, type, unpack(args))
+        end
+    else
+        for _, v in ipairs(player.GetAll()) do
+            if IsValid(v) and (v:GetPos():Distance(pPlayer:GetPos()) <= distance) then
+                self:SendMessage(v, type, unpack(args))
+            end
+        end
+    end
+end
 
 
 --- Gets the name of a key by its code.
