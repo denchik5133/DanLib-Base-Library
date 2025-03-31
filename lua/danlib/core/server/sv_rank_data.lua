@@ -107,6 +107,11 @@ end
 --- Checks if the player is an owner, and assigns the rank 'rank_owner' if so.
 -- @param pPlayer: The player to be checked.
 function base.AssignOwnerRank(pPlayer)
+    -- NULL check
+    if (not IsValid(pPlayer)) then
+        return false
+    end
+
     local ownerID = base.InitOwnerServer() -- Get the owner ID
 
     -- If the owner ID is empty, return false
