@@ -19,7 +19,7 @@
 
 local base = DanLib.Func
 local ui = DanLib.UI
-local customUtils = DanLib.CustomUtils
+local customUtils = DanLib.CustomUtils.Create
 local utils = DanLib.Utils
 local Table = DanLib.Table
 
@@ -51,7 +51,7 @@ function base:ScreenNotification(title, text, mIcon, nTime, sColor)
     if IsValid(ON_SCREEN_POPUP_NOTIFI) then ON_SCREEN_POPUP_NOTIFI:OldRemove() end
 
     -- Creating a new notification frame
-    local frame = customUtils.Create(nil, 'DFrame')
+    local frame = customUtils(nil, 'DFrame')
     ON_SCREEN_POPUP_NOTIFI = frame
 
     -- Initialising frame parameters
@@ -163,12 +163,20 @@ end)
 
 
 
-
-
-
-
-
-function base:CreatePopupNotifi(parent, tTitle, tText, tType)
+--- Creates a popup notification in the UI
+-- Displays a notification box with a title, message and icon based on the notification type.
+-- Only one notification can be visible at a time - showing a new one will remove any existing notification.
+--
+-- @param parent (Panel): The parent panel where the notification will be displayed
+-- @param tTitle (string): The title text displayed at the top of the notification
+-- @param tText (string): The main message text of the notification
+-- @param tType (string): The type of notification which determines its color and icon. Allowed values: 'ADMIN', 'ERROR', 'NOTIFICATION', 'WARNING', 'CONFIRM'
+-- @param nTime (number): The time in seconds that the notification will remain visible before automatically closing
+--
+-- @usage
+-- base:CreateUIPopupNotifi(mainPanel, 'Success', 'Operation completed successfully!', 'NOTIFICATION', 3)
+-- base:CreateUIPopupNotifi(frame, 'Warning', 'Your session will expire soon.', 'WARNING', 10)
+function base:CreateUIPopupNotifi(parent, tTitle, tText, tType, nTime)
     if IsValid(ON_SCREEN_POPUP_NOTIFI) then ON_SCREEN_POPUP_NOTIFI:Remove() end
 
     tTitle = tTitle or 'nil'
@@ -177,7 +185,7 @@ function base:CreatePopupNotifi(parent, tTitle, tText, tType)
     local Margin = 6
     local Size = 32
 
-    local debug_pnl = customUtils.Create(parent)
+    local debug_pnl = customUtils(parent)
     ON_SCREEN_POPUP_NOTIFI = debug_pnl
     debug_pnl:SetSize(0, 0)
     debug_pnl:SetDrawOnTop(true)
@@ -198,10 +206,10 @@ function base:CreatePopupNotifi(parent, tTitle, tText, tType)
     debug_pnl:ApplyEvent(nil, function(sl, w, h)
         local Color = (sl.color or base:Theme('decor'))
         utils:DrawRect(0, 0, w, h, base:Theme('primary_notifi'))
-
-        local borderR = 2
-        utils:DrawRect(4, borderR + 4, borderR, h - borderR - 10, Color)
-        utils:DrawRect(w - borderR - 4, borderR + 4, borderR, h - borderR - 10, Color)
+        utils:DrawRoundedMask(6, 0, 0, w, h, function()
+            utils:DrawRoundedBox(0, 0, 4, h, Color)
+            utils:DrawRoundedBox(w - 4, 0, 4, h, Color)
+        end)
         utils:DrawIcon(34 - Size * 0.5, h * 0.5 - Size * 0.5, Size, Size, sl.Mat, Color)
 
         DrawText(upper(tTitle), 'danlib_font_20', 65, 8, Color)
@@ -209,8 +217,8 @@ function base:CreatePopupNotifi(parent, tTitle, tText, tType)
     end)
 
     debug_pnl:ApplyEvent('Close', function(sl)
-        sl:MoveTo(sl.finalX, parent:GetTall(), 0.3, nil, nil, function()
-            sl:Remove()
+        debug_pnl:MoveTo(debug_pnl.finalX, parent:GetTall(), 0.3, nil, nil, function()
+            debug_pnl:Remove()
         end)
     end)
 
@@ -227,29 +235,66 @@ function base:CreatePopupNotifi(parent, tTitle, tText, tType)
 end
 
 
+
 local Count = 0
+local NotificationPanels = {} -- Table for storing all active notification panels
+
 local function InQuad(fraction, beginning, change)
     return change * (fraction ^ 2) + beginning
 end
 
--- Side Pop-up Notification
+-- Function to recalculate positions of all active notifications
+local function RecalculatePositions()
+    -- Sort notifications by index in the table to keep the correct order
+    local y_start = 10 -- Small indentation from the top of the screen
+    local spacing = 46 -- Vertical spacing between notifications
+    
+    for i, panel in ipairs(NotificationPanels) do
+        local targetY = y_start + (i - 1) * spacing
+        local currentX, currentY = panel:GetPos()
+        
+        -- Create moving animation
+        local moveAnim = Derma_Anim('Linear', panel, function(pnl, anim, delta, data)
+            pnl:SetPos(currentX, Lerp(delta, currentY, targetY))
+        end)
+        
+        moveAnim:Start(0.3)
+        
+        -- Update Think function to start animation
+        local oldThink = panel.Think
+        panel.Think = function(self)
+            if moveAnim:Active() then 
+                moveAnim:Run() 
+            elseif oldThink then
+                oldThink(self)
+            end
+        end
+    end
+end
+
+
+
+--- Side Pop-up Notification
+-- Displays a notification message at the side of the screen.
+-- The notification will appear with an animation, stay for the specified time, and then fade out.
+-- When a notification is removed, all remaining notifications will reposition themselves.
 --
--- text => Any text you like.
--- 2. tType => Place one of the types. All types: "Admin", "ERROR", "Notification", "Warning", "Confirm".
---    Also with one of the selected type, the color of the icon will change. 
--- 3. sTime => The time is put in seconds. 5 seconds, 10 seconds, 15 seconds, 20 seconds et cetera.
+-- @param text (string): The text message to display in the notification
+-- @param tType (string): The type of notification which determines its color and icon. Allowed values: 'ADMIN', 'ERROR', 'NOTIFICATION', 'WARNING', 'CONFIRM'
+-- @param sTime (number): The time in seconds that the notification will remain visible before fading out
 --
--- Example:
---    base:SidePopupNotification('CARROTS. Usually in the household, the word "carrot" refers to the widespread root vegetable of this particular plant, which is usually categorized as a vegetable.', 'Warning', 5)
+-- @usage
+-- NotificationSystem.SidePopupNotification('This is an important message!', 'WARNING', 5)
+-- base:SidePopupNotification('Operation completed successfully.', 'NOTIFICATION', 3)
 function base:SidePopupNotification(text, tType, sTime)
     local w_size
     local x_start = 15
-    local y_start = ScreenScale(34) + Count * 46
+    local y_start = 10 + (#NotificationPanels * 46) -- Start with a small indentation from the top
 
     text = text or ''
     w_size = utils:GetTextSize(text, 'danlib_font_18')
 
-    local debug_pnl = customUtils.Create(parent)
+    local debug_pnl = customUtils(parent)
     local height = ui:ClampScaleH(debug_pnl, 40, 40)
 
     debug_pnl:SetSize(55 + w_size, height)
@@ -274,8 +319,11 @@ function base:SidePopupNotification(text, tType, sTime)
         draw.SimpleText(text, 'danlib_font_18', 40, h * 0.5, base:Theme('title'), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
     end)
 
+    -- Add a panel to the table of active notifications
+    Table:Add(NotificationPanels, debug_pnl)
+    
     local anim = Derma_Anim('Linear', debug_pnl, function(pnl, anim, delta, data)
-        pnl:SetPos(x_start, InQuad(delta, y_start, -ScreenScale(30)))
+        -- Do not change vertical position during animation, only transparency
         pnl:SetAlpha(delta * 255)
     end)
 
@@ -299,74 +347,18 @@ function base:SidePopupNotification(text, tType, sTime)
             if anim2:Active() then anim2:Run() end
         end
         
-        base:TimerSimple(0.5, function ()
-            debug_pnl:Remove()
-            Count = max(0, Count - 1)
+        base:TimerSimple(0.5, function()
+            -- Finding and removing a panel from the table
+            for i, panel in ipairs(NotificationPanels) do
+                if panel == debug_pnl then
+                    table.remove(NotificationPanels, i)
+                    debug_pnl:Remove()
+                    
+                    -- Recalculate the positions of the remaining notifications
+                    RecalculatePositions()
+                    break
+                end
+            end
         end)
     end)
-
-    Count = Count + 1
 end
-
-
-
-
-local notif_tbl = {}
-local InvertNotifications = false -- Put notifications on the bottom right, rather than on the top right
-
-local function AddLegalNotice(text, icon, time)
-    text = text or 'No text!'
-
-    local size_x, size_y = utils:GetTextSize(text, 'danlib_font_24')
-    local height = base:GetSize(20)
-
-    local debug_pnl = customUtils.Create()
-    debug_pnl:SetSize(size_x + base:GetSize(50), size_y + base:GetSize(15))
-
-    for _, v in pairs(notif_tbl) do
-        if IsValid(v) then
-            height = v:GetTall() + base:GetSize(20) + height
-        end
-    end
-
-    debug_pnl:SetPos(ScrW() - debug_pnl:GetWide() - base:GetSize(20), (InvertNotifications and (ScrH() - height - debug_pnl:GetTall()) or height))
-    debug_pnl:SetDrawOnTop(true)
-
-    debug_pnl.Size = 22
-    debug_pnl.Margin = 2
-    debug_pnl.Icon = (DanLib.TYPE[icon] or DanLib.TYPE['ERROR'])
-    debug_pnl.Color = (DanLib.TYPE_COLOR[icon] or DanLib.TYPE_COLOR['ERROR'])
-
-    debug_pnl:ApplyEvent(nil, function(sl, w, h)
-        local Color = (sl.color or base:Theme('decor'))
-        utils:DrawRect(0, 0, w, h, base:Theme('primary_notifi'))
-        utils:DrawRect(4, 4, sl.Margin, h - 8, Color)
-        utils:DrawRect(w - sl.Margin - 4, 4, sl.Margin, h - 8, Color)
-        utils:DrawIcon(22 - sl.Size * 0.5, h * 0.5 - sl.Size * 0.5, sl.Size, sl.Size, sl.Icon, Color)
-
-        draw.DrawText(text, 'danlib_font_22', 34, h / 2, base:Theme('title'), TEXT_ALIGN_LEFT)
-    end)
-
-    function debug_pnl:OnRemove()
-        local height = base:GetSize(50)
-
-        for k, v in pairs(notif_tbl) do
-            if (v == self or !IsValid(v)) then
-                notif_tbl[k] = nil
-                k = k - 1
-            else
-                v:MoveTo(select(1, v:GetPos()), (InvertNotifications and (ScrH() - height - v:GetTall()) or height), 0.2, 0, 0.3)
-                height = v:GetTall() + base:GetSize(20) + height
-            end
-        end
-    end
-
-    base:TimerSimple(time or 5, function()
-        if IsValid(debug_pnl) then
-            debug_pnl:Remove()
-        end
-    end)
-
-    Table:Add(notif_tbl, debug_pnl)
-end
--- AddLegalNotice()
