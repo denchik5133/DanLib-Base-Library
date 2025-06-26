@@ -18,6 +18,9 @@
 
 
 local metaPanel = DanLib.MetaPanel
+local DCustomUtils = DanLib.CustomUtils.Create
+local DBase = DanLib.Func
+local DUtils = DanLib.Utils
 DanLib.UI = DanLib.UI or {}
 local UI = DanLib.UI
 
@@ -39,6 +42,7 @@ local drawRect = surface.DrawRect
 local SetFont = surface.SetFont
 local getTextSize = surface.GetTextSize
 local setTextColor = surface.SetTextColor
+local find = string.find
 
 local draw = draw
 local SimpleText = draw.SimpleText
@@ -121,7 +125,7 @@ function metaPanel:ApplyShadow(distance, noClip, iteration)
 	iteration = iteration or 5 -- Set the default number of iterations
 	local color = Color(0, 0, 0) -- Shadow colour
 
-	local panel = DanLib.CustomUtils.Create(self:GetParent())
+	local panel = DCustomUtils(self:GetParent())
 	panel:ApplyEvent('Think', function(sl, w, h)
 		if (not UI:valid(self)) then
 			sl:Remove() -- Delete a panel if the parent panel is invalid
@@ -212,16 +216,25 @@ end)
 -- @param align (number): The alignment of the tooltip (default is CENTER).
 function metaPanel:ApplyTooltip(text, strColor, strIcon, align)
     align = align or CENTER
-    strColor = strColor or DanLib.Func:Theme('text')
+    strColor = strColor or DBase:Theme('text')
+    local defaultFont = 'danlib_font_18'
 
     local function Tooltip(Panel, text)
-        if (not UI:valid(Panel)) then return end
+        if (not UI:valid(Panel)) then
+            return
+        end
 
-        local w, h = DanLib.Utils:GetTextSize(text, defaultFont)
+        local isMultiline = find(text, '\n') ~= nil
+        local hasMarkup = find(text, '{') and find(text, '}')
+
+        -- use safe dimensioning
+        local w, h = DUtils:GetSafeTextSize(text, defaultFont)
+
         local padding = strIcon and 50 or 20
-        local tooltipWidth, tooltipHeight = w + padding, h + 10
+        local tooltipWidth = w + padding
+        local tooltipHeight = h + 10
 
-        local lbl = DanLib.CustomUtils.Create(self)
+        local lbl = DCustomUtils(self)
         lbl:SetSize(tooltipWidth, tooltipHeight)
         lbl:SetMouseInputEnabled(false)
         lbl:SetAlpha(0)
@@ -231,7 +244,10 @@ function metaPanel:ApplyTooltip(text, strColor, strIcon, align)
 
         local SW, SH = DanLib.ScrW, DanLib.ScrH
         lbl:ApplyEvent('Think', function(sl)
-            if (not UI:valid(Panel) or not Panel:IsVisible()) then sl:Remove() return end
+            if (not UI:valid(Panel) or not Panel:IsVisible()) then
+                sl:Remove()
+                return
+            end
 
             -- Getting cursor coordinates
             local mouse_x, mouse_y = gui.MouseX(), gui.MouseY()
@@ -283,17 +299,43 @@ function metaPanel:ApplyTooltip(text, strColor, strIcon, align)
         lbl:ApplyEvent(nil, function(sl, w, h)
 			DanLib.DrawShadow:Begin()
 			local x, y = sl:LocalToScreen(0, 0)
-			DanLib.Utils:DrawRoundedBox(x, y, w, h, DanLib.Func:Theme('primary_notifi'))
+			DUtils:DrawRoundedBox(x, y, w, h, DBase:Theme('primary_notifi'))
 			DanLib.DrawShadow:End(1, 1, 1, 255, 0, 0, false)
 
             -- Draw an icon, if any
             if strIcon then
                 local iconY = h * 0.5 - 9 -- Centre the icon vertically
-                DanLib.Utils:DrawIconOrMaterial(14, iconY, 18, strIcon, strColor)
+                DUtils:DrawIconOrMaterial(14, iconY, 18, strIcon, strColor)
             end
 
-            -- Drawing text
-            draw.DrawText(text, defaultFont, strIcon and 38 or 10, 4, strColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            local textX = strIcon and 38 or 10
+            
+            -- maximum available width for DrawParseText
+            local availableWidth = w - textX - 5 -- reduced the indentation from 10 to 5
+            
+            if isMultiline then
+                local lines = string.Explode('\n', text)
+                local lineHeight = select(2, DUtils:TextSize('Test', defaultFont).h) or 16
+                local startY = 5
+                
+                for i, line in ipairs(lines) do
+                    local lineY = startY + (i - 1) * lineHeight
+                    if hasMarkup and DUtils.DrawParseText then
+                        DUtils:DrawParseText(line, defaultFont, textX, lineY, strColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, availableWidth, TEXT_ALIGN_LEFT)
+                    else
+                        draw.DrawText(line, defaultFont, textX, lineY, strColor, TEXT_ALIGN_LEFT)
+                    end
+                end
+            else
+                if hasMarkup and DUtils.DrawParseText then
+                    local centerY = h * 0.5
+                    -- Pass the maximum width to prevent carryover
+                    DUtils:DrawParseText(text, defaultFont, textX, centerY, strColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, availableWidth, TEXT_ALIGN_LEFT)
+                else
+                    local centerY = h * 0.5 - 10
+                    draw.DrawText(text, defaultFont, textX, centerY, strColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                end
+            end
         end)
 
         return lbl
@@ -379,7 +421,7 @@ function metaPanel:ApplyLerpColor(var, to, duration, callback)
     anim.Think = function(anim, pnl, fract)
         local newFract = DanLibUI:Ease(fract, 0, 1, 1)
         if (not anim.StartColor) then anim.StartColor = color end
-        self[var] = DanLib.Utils:LerpColor(newFract, anim.StartColor, anim.Color)
+        self[var] = DUtils:LerpColor(newFract, anim.StartColor, anim.Color)
     end
     anim.OnEnd = function() if callback then callback(self) end end
 end
