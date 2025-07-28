@@ -873,6 +873,121 @@ end
 
 
 do
+    -- Configuration constants
+    local ADAPTIVE_SCALING_CONFIG = {
+        MIN_SIZE = 32,          -- Minimum icon size (32x32)
+        MAX_SIZE = 124,         -- Maximum icon size (124x124)
+        WIDTH_RATIO = 0.25,     -- Parent width ratio for size calculation
+        HEIGHT_RATIO = 0.6,     -- Parent height ratio for size calculation
+        PIXEL_PERFECT = true    -- Ensure even pixel dimensions
+    }
+
+
+    --- Calculate adaptive icon size based on parent container dimensions
+    -- @param parentWidth (number): Width of the parent container
+    -- @param parentHeight (number): Height of the parent container  
+    -- @param minSize (number, optional): Minimum size constraint (default: 32)
+    -- @param maxSize (number, optional): Maximum size constraint (default: 124)
+    -- @param options (table, optional): Additional scaling options
+    -- @return (number): Calculated icon size
+    function utils:CalculateAdaptiveIconSize(parentWidth, parentHeight, minSize, maxSize, options)
+        -- Set default values
+        minSize = minSize or ADAPTIVE_SCALING_CONFIG.MIN_SIZE
+        maxSize = maxSize or ADAPTIVE_SCALING_CONFIG.MAX_SIZE
+        options = options or {}
+        
+        -- Get scaling ratios (allow override via options)
+        local widthRatio = options.widthRatio or ADAPTIVE_SCALING_CONFIG.WIDTH_RATIO
+        local heightRatio = options.heightRatio or ADAPTIVE_SCALING_CONFIG.HEIGHT_RATIO
+        
+        -- Calculate base size from parent dimensions
+        local widthBasedSize = parentWidth * widthRatio
+        local heightBasedSize = parentHeight * heightRatio
+        local baseSize = min(widthBasedSize, heightBasedSize)
+        
+        -- Apply size constraints
+        local adaptiveSize = max(minSize, min(maxSize, baseSize))
+        
+        -- Ensure pixel-perfect rendering (even numbers)
+        if ADAPTIVE_SCALING_CONFIG.PIXEL_PERFECT then
+            adaptiveSize = floor(adaptiveSize / 2) * 2
+        end
+
+        return adaptiveSize
+    end
+    
+
+    --- Enhanced DrawIcon function with adaptive scaling support
+    -- @param x (number): X position
+    -- @param y (number): Y position  
+    -- @param parentW (number): Parent container width
+    -- @param parentH (number): Parent container height
+    -- @param icon (string): Icon identifier
+    -- @param color (Color): Icon color
+    -- @param customSize (number, optional): Override calculated size
+    -- @param options (table, optional): Additional options
+    -- @return (number): Final icon size used
+    function utils:DrawAdaptiveIcon(x, y, parentW, parentH, icon, color, customSize, options)
+        options = options or {}
+        
+        -- Calculate or use provided size
+        local iconSize = customSize or self:CalculateAdaptiveIconSize(parentW, parentH, 
+            options.minSize, options.maxSize, options)
+        
+        -- Calculate centered position if requested
+        local finalX, finalY = x, y
+        if options.centerX then
+            finalX = x + (parentW - iconSize) * 0.5
+        end
+        if options.centerY then
+            finalY = y + (parentH - iconSize) * 0.5
+        end
+        
+        -- Use existing DrawIcon function with calculated parameters
+        self:DrawIcon(finalX, finalY, iconSize, iconSize, icon, color)
+        
+        return iconSize
+    end
+    
+
+    --- Batch calculate adaptive sizes for multiple containers
+    --- Useful for optimizing multiple icon calculations
+    -- @param containers (table): Array of {width, height} pairs
+    -- @param options (table, optional): Scaling options
+    -- @return (table): Array of calculated icon sizes
+    function utils:BatchCalculateAdaptiveSizes(containers, options)
+        local results = {}
+        for i, container in ipairs(containers) do
+            results[i] = self:CalculateAdaptiveIconSize(
+                container[1], container[2], 
+                options and options.minSize, 
+                options and options.maxSize, 
+                options
+            )
+        end
+        return results
+    end
+    
+    --- Get scaling information for debugging/monitoring
+    -- @param parentW (number): Parent width
+    -- @param parentH (number): Parent height
+    -- @return (table): Scaling information
+    function utils:GetAdaptiveScalingInfo(parentW, parentH)
+        local size = self:CalculateAdaptiveIconSize(parentW, parentH)
+        return {
+            parentWidth = parentW,
+            parentHeight = parentH,
+            calculatedSize = size,
+            scaleFactor = size / ADAPTIVE_SCALING_CONFIG.MIN_SIZE,
+            isMinSize = (size == ADAPTIVE_SCALING_CONFIG.MIN_SIZE),
+            isMaxSize = (size == ADAPTIVE_SCALING_CONFIG.MAX_SIZE),
+            config = ADAPTIVE_SCALING_CONFIG
+        }
+    end
+end
+
+
+do
     --- Sets the parameters for the operation of the cStepsil.
     -- @param stencilValue: Value for stencil, defaults to 1.
     local function SetupStencil(stencilValue)
