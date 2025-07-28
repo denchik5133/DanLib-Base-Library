@@ -17,10 +17,10 @@
  
 
 
-local base = DanLib.Func
+local DBase = DanLib.Func
 local ui = DanLib.UI
-local customUtils = DanLib.CustomUtils.Create
-local utils = DanLib.Utils
+local DCustomUtils = DanLib.CustomUtils.Create
+local DUtils = DanLib.Utils
 local Table = DanLib.Table
 
 local vector = Vector
@@ -46,12 +46,12 @@ if IsValid(ON_SCREEN_POPUP_NOTIFI) then ON_SCREEN_POPUP_NOTIFI:Remove() end
 -- @param nTime (number): Notification display time (in seconds)
 -- @param sColor (Color): The colour of the notification (if not specified, the default colour for the icon type is used)
 -- @return frame (DFrame): The notification frame created
-function base:ScreenNotification(title, text, mIcon, nTime, sColor)
+function DBase:ScreenNotification(title, text, mIcon, nTime, sColor)
     -- Deleting a previous notification if it exists
     if IsValid(ON_SCREEN_POPUP_NOTIFI) then ON_SCREEN_POPUP_NOTIFI:OldRemove() end
 
     -- Creating a new notification frame
-    local frame = customUtils(nil, 'DFrame')
+    local frame = DCustomUtils(nil, 'DFrame')
     ON_SCREEN_POPUP_NOTIFI = frame
 
     -- Initialising frame parameters
@@ -62,15 +62,50 @@ function base:ScreenNotification(title, text, mIcon, nTime, sColor)
     frame:SetDrawOnTop(true)
 
     -- Setting the title, text and icon
-    frame.title = title or base:L('#no.data')
-    frame.text = utils:TextWrap(text, 'danlib_font_20', 340)
+    frame.title = title or DBase:L('#no.data')
+    local wrap = 370
+    frame.text = DUtils:TextWrap(text, 'danlib_font_20', wrap)
     frame.icon = (DanLib.TYPE[mIcon] or DanLib.TYPE['ERROR'])
     frame.color = (DanLib.TYPE_COLOR[mIcon] or DanLib.TYPE_COLOR['ERROR'])
     frame.time = nTime or 5
-    frame.text_h = utils:TextSize(frame.text, 'danlib_font_20').h
+    frame.text_h = DUtils:TextSize(frame.text, 'danlib_font_20').h
 
     local sizeF = 420
     local alpha = 0
+
+    -- Enhanced Paint function with adaptive icons
+    function frame.Paint(sl, w, h)
+        -- Draw notification background with shadow
+        DanLib.DrawShadow:Begin()
+            local x, y = sl:LocalToScreen(0, 0)
+            DUtils:DrawRoundedBox(x, y, w, h, DBase:Theme('primary_notifi'))
+        DanLib.DrawShadow:End(1, 1, 1, 255, 0, 0, false)
+        
+        -- Draw colored borders
+        DUtils:DrawRoundedMask(6, 0, 0, w, h, function()
+            DUtils:DrawRoundedBox(0, 0, 4, h, sl.color)
+            DUtils:DrawRoundedBox(w - 4, 0, 4, h, sl.color)
+        end)
+        
+        -- Calculate adaptive icon size and position
+        local iconSize = DUtils:CalculateAdaptiveIconSize(w, h, 32, 124)
+        
+        -- Center icon in the right area of notification
+        local iconX = w - iconSize - 15
+        local iconY = h * 0.5 - iconSize * 0.5
+        
+        -- Draw adaptive icon
+        DUtils:DrawIcon(iconX, iconY, iconSize, iconSize, sl.icon, ColorAlpha(sl.color, alpha - 230))
+        
+        -- Draw text content
+        DrawText(string.upper(sl.title), 'danlib_font_22', 30, 6, ColorAlpha(sl.color, alpha))
+        DUtils:DrawParseText(text, 'danlib_font_20', 30, 32, DBase:Theme('text', alpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, wrap, TEXT_ALIGN_LEFT)
+        
+        -- Debug info (only in debug mode)
+        if DanLib.DEBUG_MODE then
+            draw.SimpleText(string.format('Icon: %dx%d', iconSize, iconSize), 'danlib_font_16', 5, h - 15, Color(255, 255, 255, 100))
+        end
+    end
 
     -- Function for creating animation of notification appearance
     function frame.Create(sl)
@@ -130,41 +165,33 @@ function base:ScreenNotification(title, text, mIcon, nTime, sColor)
         end
     end
 
-    -- Function for frame rendering
-    function frame.Paint(sl, w, h)
-        DanLib.DrawShadow:Begin()
-            local x, y = sl:LocalToScreen(0, 0)
-            utils:DrawRoundedBox(x, y, w, h, base:Theme('primary_notifi'))
-        DanLib.DrawShadow:End(1, 1, 1, 255, 0, 0, false)
-
-        utils:DrawRoundedMask(6, 0, 0, w, h, function()
-            utils:DrawRoundedBox(0, 0, 4, h, sl.color)
-            utils:DrawRoundedBox(w - 4, 0, 4, h, sl.color)
-        end)
-
-        local size = 32
-        utils:DrawIcon(20, h * 0.5 - size * 0.5, size, size, sl.icon, ColorAlpha(sl.color, alpha))
-        DrawText(upper(sl.title), 'danlib_font_22', 65, 6, ColorAlpha(sl.color, alpha))
-        utils:DrawParseText(text, 'danlib_font_20', 65, 32, base:Theme('text', alpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 340, TEXT_ALIGN_LEFT)
-    end
-
     frame:Create()
     return frame
 end
 
+
+-- Debug mode toggle
+concommand.Add('danlib_debug_adaptive', function(pPlayer, cmd, args)
+    if (not IsValid(pPlayer)) then
+        return
+    end
+    
+    DanLib.DEBUG_MODE = not DanLib.DEBUG_MODE
+    print('DanLib Adaptive Scaling Debug Mode: ' .. (DanLib.DEBUG_MODE and 'ON' or 'OFF'))
+end)
 
 concommand.Add('popup_debugtest1', function(pPlayer)
     if (pPlayer:SteamID64() ~= '76561198405398290' and pPlayer:SteamID64() ~= '76561199493672657') then
         return false, print 'This command is intended for the developer only. It is only used for testing purposes.'
     end
 
-    base:ScreenNotification('CONFIG FILED', "The ability to save data about how a user wants to use an application is an important part of programming. Fortunately, it's a common task for programmers, so much of the work has probably already been done. Find a good library for encoding and decoding into an open format, and you can provide a persistent and consistent user experience.", 'ADMIN')
+    DBase:ScreenNotification('CONFIG FILED', "The ability to save data about how a user wants to use an application is an important part of programming. Fortunately, it's a common task for programmers, so much of the work has probably already been done. Find a good library for encoding and decoding into an open format, and you can provide a persistent and consistent user experience.", 'ADMIN')
 end)
 
 
 
 --- Creates a popup notification in the UI
--- Displays a notification box with a title, message and icon based on the notification type.
+-- Displays a notification box with a title, message and icon DBased on the notification type.
 -- Only one notification can be visible at a time - showing a new one will remove any existing notification.
 --
 -- @param parent (Panel): The parent panel where the notification will be displayed
@@ -174,9 +201,9 @@ end)
 -- @param nTime (number): The time in seconds that the notification will remain visible before automatically closing
 --
 -- @usage
--- base:CreateUIPopupNotifi(mainPanel, 'Success', 'Operation completed successfully!', 'NOTIFICATION', 3)
--- base:CreateUIPopupNotifi(frame, 'Warning', 'Your session will expire soon.', 'WARNING', 10)
-function base:CreateUIPopupNotifi(parent, tTitle, tText, tType, nTime)
+-- DBase:CreateUIPopupNotifi(mainPanel, 'Success', 'Operation completed successfully!', 'NOTIFICATION', 3)
+-- DBase:CreateUIPopupNotifi(frame, 'Warning', 'Your session will expire soon.', 'WARNING', 10)
+function DBase:CreateUIPopupNotifi(parent, tTitle, tText, tType, nTime)
     if IsValid(ON_SCREEN_POPUP_NOTIFI) then ON_SCREEN_POPUP_NOTIFI:Remove() end
 
     tTitle = tTitle or 'nil'
@@ -185,7 +212,7 @@ function base:CreateUIPopupNotifi(parent, tTitle, tText, tType, nTime)
     local Margin = 6
     local Size = 32
 
-    local debug_pnl = customUtils(parent)
+    local debug_pnl = DCustomUtils(parent)
     ON_SCREEN_POPUP_NOTIFI = debug_pnl
     debug_pnl:SetSize(0, 0)
     debug_pnl:SetDrawOnTop(true)
@@ -193,8 +220,8 @@ function base:CreateUIPopupNotifi(parent, tTitle, tText, tType, nTime)
     debug_pnl.time = nTime or 5
     debug_pnl.Mat = (DanLib.TYPE[tType] or DanLib.TYPE['ERROR'])
     debug_pnl.color = (DanLib.TYPE_COLOR[tType] or DanLib.TYPE_COLOR['ERROR'])
-    debug_pnl.title = utils:TextWrap(tText, 'danlib_font_18', 400)
-    local titleX, titleY = utils:GetTextSize(debug_pnl.title, 'danlib_font_18')
+    debug_pnl.title = DUtils:TextWrap(tText, 'danlib_font_18', 400)
+    local titleX, titleY = DUtils:GetTextSize(debug_pnl.title, 'danlib_font_18')
 
     debug_pnl:SetWide(380)
     debug_pnl:SetTall(40 + titleY)
@@ -204,16 +231,16 @@ function base:CreateUIPopupNotifi(parent, tTitle, tText, tType, nTime)
     debug_pnl:MoveTo(debug_pnl.finalX, debug_pnl.finalY, 0.3)
 
     debug_pnl:ApplyEvent(nil, function(sl, w, h)
-        local Color = (sl.color or base:Theme('decor'))
-        utils:DrawRect(0, 0, w, h, base:Theme('primary_notifi'))
-        utils:DrawRoundedMask(6, 0, 0, w, h, function()
-            utils:DrawRoundedBox(0, 0, 4, h, Color)
-            utils:DrawRoundedBox(w - 4, 0, 4, h, Color)
+        local Color = (sl.color or DBase:Theme('decor'))
+        DUtils:DrawRect(0, 0, w, h, DBase:Theme('primary_notifi'))
+        DUtils:DrawRoundedMask(6, 0, 0, w, h, function()
+            DUtils:DrawRoundedBox(0, 0, 4, h, Color)
+            DUtils:DrawRoundedBox(w - 4, 0, 4, h, Color)
         end)
-        utils:DrawIcon(34 - Size * 0.5, h * 0.5 - Size * 0.5, Size, Size, sl.Mat, Color)
+        DUtils:DrawIcon(34 - Size * 0.5, h * 0.5 - Size * 0.5, Size, Size, sl.Mat, Color)
 
         DrawText(upper(tTitle), 'danlib_font_20', 65, 8, Color)
-        DrawText(sl.title, 'danlib_font_18', 65, 30, base:Theme('text'))
+        DrawText(sl.title, 'danlib_font_18', 65, 30, DBase:Theme('text'))
     end)
 
     debug_pnl:ApplyEvent('Close', function(sl)
@@ -273,7 +300,6 @@ local function RecalculatePositions()
 end
 
 
-
 --- Side Pop-up Notification
 -- Displays a notification message at the side of the screen.
 -- The notification will appear with an animation, stay for the specified time, and then fade out.
@@ -285,16 +311,16 @@ end
 --
 -- @usage
 -- NotificationSystem.SidePopupNotification('This is an important message!', 'WARNING', 5)
--- base:SidePopupNotification('Operation completed successfully.', 'NOTIFICATION', 3)
-function base:SidePopupNotification(text, tType, sTime)
+-- DBase:SidePopupNotification('Operation completed successfully.', 'NOTIFICATION', 3)
+function DBase:SidePopupNotification(text, tType, sTime)
     local w_size
     local x_start = 15
     local y_start = 10 + (#NotificationPanels * 46) -- Start with a small indentation from the top
 
     text = text or ''
-    w_size = utils:GetTextSize(text, 'danlib_font_18')
+    w_size = DUtils:GetTextSize(text, 'danlib_font_18')
 
-    local debug_pnl = customUtils(parent)
+    local debug_pnl = DCustomUtils(parent)
     local height = ui:ClampScaleH(debug_pnl, 40, 40)
 
     debug_pnl:SetSize(55 + w_size, height)
@@ -309,14 +335,14 @@ function base:SidePopupNotification(text, tType, sTime)
     debug_pnl:ApplyEvent(nil, function(sl, w, h)
         DanLib.DrawShadow:Begin()
         local x, y = sl:LocalToScreen(0, 0)
-        utils:DrawRect(x, y, w, h, base:Theme('primary_notifi'))
+        DUtils:DrawRect(x, y, w, h, DBase:Theme('primary_notifi'))
         DanLib.DrawShadow:End(1, 1, 1, 255, 0, 0, false)
 
-        utils:DrawRect(4, 6, 2, h - 12, sl.Color)
-        utils:DrawRect(w - 6, 6, 2, h - 12, sl.Color)
-        utils:DrawIcon(12, (h / 2) - (sl.Size / 2), sl.Size, sl.Size, sl.Icon, sl.Color)
+        DUtils:DrawRect(4, 6, 2, h - 12, sl.Color)
+        DUtils:DrawRect(w - 6, 6, 2, h - 12, sl.Color)
+        DUtils:DrawIcon(12, (h / 2) - (sl.Size / 2), sl.Size, sl.Size, sl.Icon, sl.Color)
 
-        draw.SimpleText(text, 'danlib_font_18', 40, h * 0.5, base:Theme('title'), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        draw.SimpleText(text, 'danlib_font_18', 40, h * 0.5, DBase:Theme('title'), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
     end)
 
     -- Add a panel to the table of active notifications
@@ -335,7 +361,7 @@ function base:SidePopupNotification(text, tType, sTime)
     anim:Start(0.5)
     if anim:Active() then anim:Run() end
 
-    base:TimerSimple(sTime or 0.5, function()
+    DBase:TimerSimple(sTime or 0.5, function()
         local anim2 = Derma_Anim('Linear', debug_pnl, function(pnl, anim, delta, data)
             pnl:SetAlpha(255 - delta * 255)
         end)
@@ -347,7 +373,7 @@ function base:SidePopupNotification(text, tType, sTime)
             if anim2:Active() then anim2:Run() end
         end
         
-        base:TimerSimple(0.5, function()
+        DBase:TimerSimple(0.5, function()
             -- Finding and removing a panel from the table
             for i, panel in ipairs(NotificationPanels) do
                 if panel == debug_pnl then
