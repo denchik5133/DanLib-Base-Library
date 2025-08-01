@@ -19,6 +19,7 @@
 /***
  *   DanLib.Func.CreateGridPanel
  *   This function creates a grid panel with customizable margins, columns, and maximum height.
+ *   Enhanced version with scrollbar fixes, sorting, and animation support.
  *
  *   @param parent The parent panel to which this grid panel will be attached.
  *   @return A new grid panel with methods for adding cells, calculating row heights, and auto-sizing.
@@ -28,46 +29,272 @@
  *   - verticalMargin: The vertical margin between rows.
  *   - columns: The number of columns in the grid.
  *   - maxHeight: The maximum height of the grid panel.
+ *   - animationEnabled: Enable/disable smooth animations.
+ *   - sortFunction: Custom sorting function for grid elements.
  */
 
 
 
-local base = DanLib.Func
-local Table = DanLib.Table
+local DBase = DanLib.Func
+local DTable = DanLib.Table
+local DUtils = DanLib.Utils
+local DCustomUtils = DanLib.CustomUtils.Create
 
- 
-function base.CreateGridPanel(parent)
+-- Animation easing functions
+local AnimationEasing = {
+    Linear = function(t) return t end,
+    EaseIn = function(t) return t * t end,
+    EaseOut = function(t) return 1 - (1 - t) * (1 - t) end,
+    EaseInOut = function(t) 
+        return t < 0.5 and 2 * t * t or 1 - math.pow(-2 * t + 2, 2) / 2
+    end
+}
+
+function DBase.CreateGridPanel(parent)
     -- Create a scrollable panel as the base for the grid
-    local PANEL = DanLib.CustomUtils.Create(parent, 'DanLib.UI.Scroll')
+    local PANEL = DCustomUtils(parent, 'DanLib.UI.Scroll')
 
     -- Define accessors for grid panel attributes
     AccessorFunc(PANEL, 'horizontalMargin', 'HorizontalMargin', FORCE_NUMBER)
     AccessorFunc(PANEL, 'verticalMargin', 'VerticalMargin', FORCE_NUMBER)
     AccessorFunc(PANEL, 'columns', 'Columns', FORCE_NUMBER)
     AccessorFunc(PANEL, 'maxHeight', 'MaxHeight', FORCE_NUMBER)
+    AccessorFunc(PANEL, 'animationDuration', 'AnimationDuration', FORCE_NUMBER)
+    AccessorFunc(PANEL, 'animationDelay', 'AnimationDelay', FORCE_NUMBER)
+    AccessorFunc(PANEL, 'animationEasing', 'AnimationEasing', FORCE_STRING)
 
-    -- Set default margins
+    -- Set default values
     PANEL:SetHorizontalMargin(4)
     PANEL:SetVerticalMargin(4)
+    PANEL:SetAnimationDuration(0.4)
+    PANEL:SetAnimationDelay(0.08)
+    PANEL:SetAnimationEasing('EaseOut')
 
-    -- Initialize rows and cells
+    -- Initialize data structures
     PANEL.Rows = {}
     PANEL.Cells = {}
+    PANEL.SortData = {}
+    PANEL.AnimationQueue = {}
+    PANEL.ScrollbarWidth = 0
+    PANEL.LastContentHeight = 0
+
+    -- Check if scrollbar is actually needed and visible
+    function PANEL:GetScrollbarWidth()
+        local contentHeight = self:GetContentHeight()
+        local panelHeight = self:GetTall()
+        
+        -- Only reserve space if scrollbar is actually needed
+        if (contentHeight > panelHeight) then
+            local vbar = self:GetVBar()
+            if IsValid(vbar) then
+                return vbar:GetWide()
+            end
+            return 16 -- Standard scrollbar width fallback
+        end
+        return 0 -- No scrollbar needed
+    end
+
+    -- Scrollbar detection and width calculation
+    function PANEL:UpdateScrollbarWidth()
+        local oldWidth = self.ScrollbarWidth
+        local contentHeight = self:GetContentHeight()
+        local panelHeight = self:GetTall()
+        
+        -- Check if scrollbar is needed
+        if (contentHeight > panelHeight) then
+            -- Scrollbar is present, measure its width
+            local vbar = self:GetVBar()
+            if (IsValid(vbar) and vbar:IsVisible()) then
+                self.ScrollbarWidth = vbar:GetWide()
+            else
+                self.ScrollbarWidth = 16 -- Default fallback
+            end
+        else
+            self.ScrollbarWidth = 0
+        end
+
+        -- If scrollbar width changed, recalculate layout
+        if (oldWidth ~= self.ScrollbarWidth) then
+            self:RecalculateLayout()
+        end
+    end
+
+    -- Get available width - subtract scrollbar only when it exists
+    function PANEL:GetAvailableWidth()
+        local scrollbarWidth = self:GetScrollbarWidth()
+        local safetyMargin = scrollbarWidth > 0 and 4 or 0 -- Safety margin only when scrollbar present
+        return math.max(50, self:GetWide() - scrollbarWidth - safetyMargin)
+    end
 
     -- Method to get the content height
     function PANEL:GetContentHeight()
         local totalHeight = 0
         for _, row in pairs(self.Rows) do
-            totalHeight = totalHeight + row:GetTall() + base:Scale(self:GetVerticalMargin())
+            if IsValid(row) then
+                totalHeight = totalHeight + row:GetTall() + DBase:Scale(self:GetVerticalMargin())
+            end
         end
-        return totalHeight
+        return math.max(0, totalHeight - DBase:Scale(self:GetVerticalMargin()))
     end
 
-    --- Adds a cell to the grid panel.
-    -- @param panel The panel to add as a cell.
-    -- @param width The width of the cell (optional).
-    -- @param height The height of the cell (optional).
-    function PANEL:AddCell(panel, width, height)
+    -- Recalculate layout for all cells
+    function PANEL:RecalculateLayout()
+        local slots = self:GetColumns()
+        local margin = self:GetHorizontalMargin()
+        local availableWidth = self:GetAvailableWidth() - margin * (slots - 1)
+        local cellWidth = availableWidth / slots
+
+        for _, cell in pairs(self.Cells) do
+            if (IsValid(cell) and not cell.CustomWidth) then
+                cell:SetWide(cellWidth)
+            end
+        end
+
+        self:InvalidateLayout(true)
+    end
+
+    -- Animation system
+    function PANEL:StartAnimation()
+        -- Clear existing animations
+        self:StopAnimation()
+
+        local animDuration = self:GetAnimationDuration()
+        local animDelay = self:GetAnimationDelay()
+        local easingFunc = AnimationEasing[self:GetAnimationEasing()] or AnimationEasing.EaseOut
+
+        -- Animate each cell sequentially
+        for i, cell in ipairs(self.Cells) do
+            if IsValid(cell) then
+                local startTime = CurTime() + (i - 1) * animDelay
+                local endTime = startTime + animDuration
+                
+                -- Store original alpha
+                cell.OriginalAlpha = cell:GetAlpha()
+                cell:SetAlpha(0)
+
+                -- Create animation data
+                local animData = {
+                    cell = cell,
+                    startTime = startTime,
+                    endTime = endTime,
+                    startAlpha = 0,
+                    endAlpha = cell.OriginalAlpha or 255,
+                    easingFunc = easingFunc,
+                    timerName = 'DanLibGrid_Anim_' .. i
+                }
+
+                table.insert(self.AnimationQueue, animData)
+
+                -- Start the animation timer
+                timer.Create(animData.timerName, 0, 0, function()
+                    if (not IsValid(cell)) then
+                        timer.Remove(animData.timerName)
+                        return
+                    end
+
+                    local currentTime = CurTime()
+                    if (currentTime < animData.startTime) then
+                        return
+                    end
+
+                    if (currentTime >= animData.endTime) then
+                        cell:SetAlpha(animData.endAlpha)
+                        timer.Remove(animData.timerName)
+                        return
+                    end
+
+                    local progress = (currentTime - animData.startTime) / animDuration
+                    local easedProgress = animData.easingFunc(progress)
+                    local currentAlpha = Lerp(easedProgress, animData.startAlpha, animData.endAlpha)
+                    
+                    cell:SetAlpha(currentAlpha)
+                end)
+            end
+        end
+    end
+
+    -- Stop all animations
+    function PANEL:StopAnimation()
+        for _, animData in pairs(self.AnimationQueue) do
+            if animData.timerName then
+                timer.Remove(animData.timerName)
+            end
+
+            if IsValid(animData.cell) then
+                animData.cell:SetAlpha(animData.cell.OriginalAlpha or 255)
+            end
+        end
+        self.AnimationQueue = {}
+    end
+
+    -- Sorting functionality
+    function PANEL:SetSortFunction(sortFunc)
+        self.SortFunction = sortFunc
+    end
+
+    function PANEL:Sort(sortFunc)
+        if (not sortFunc and not self.SortFunction) then
+            print('[DanLib Grid] No sort function provided')
+            return
+        end
+
+        local actualSortFunc = sortFunc or self.SortFunction
+        
+        -- Create sortable data array
+        local sortableData = {}
+        for i, cell in ipairs(self.Cells) do
+            table.insert(sortableData, {
+                cell = cell,
+                data = cell.SortData or {},
+                index = i
+            })
+        end
+
+        -- Sort the data
+        table.sort(sortableData, function(a, b)
+            return actualSortFunc(a.data, b.data, a.cell, b.cell)
+        end)
+
+        -- Rebuild the grid with sorted order
+        local sortedCells = {}
+        for _, item in ipairs(sortableData) do
+            table.insert(sortedCells, item.cell)
+        end
+
+        self:RebuildGrid(sortedCells)
+    end
+
+    -- Rebuild grid with new cell order
+    function PANEL:RebuildGrid(newCellOrder)
+        -- Clear existing rows
+        for _, row in pairs(self.Rows) do
+            if IsValid(row) then
+                row:Remove()
+            end
+        end
+        self.Rows = {}
+
+        -- Update cells array
+        if newCellOrder then
+            self.Cells = newCellOrder
+        end
+
+        -- Re-add cells in new order
+        local tempCells = table.Copy(self.Cells)
+        self.Cells = {}
+
+        for _, cell in ipairs(tempCells) do
+            if IsValid(cell) then
+                self:AddCellToGrid(cell, cell.CustomWidth, cell.CustomHeight)
+            end
+        end
+
+        self:UpdateScrollbarWidth()
+        self:StartAnimation()
+    end
+
+    -- Internal method to add cell to grid
+    function PANEL:AddCellToGrid(panel, customWidth, customHeight)
         local slots = self:GetColumns()
         local index = math.floor(#self.Cells / slots) + 1
         local margin = self:GetHorizontalMargin()
@@ -79,146 +306,241 @@ function base.CreateGridPanel(parent)
         panel:SetParent(self.Rows[index])
         panel:Dock(LEFT)
         panel:DockMargin(0, 0, (#self.Rows[index].Items + 1 < slots) and margin or 0, 0)
-        -- panel:SetWide((self:GetWide() - margin * (slots - 1)) / slots)
 
-        -- Set the width of the panel with the scroll bar taken into account
-        -- local availableWidth = self:GetWide() - margin * (slots - 1)
-        -- if (self:GetTall() < self:GetContentHeight()) then
-        --     availableWidth = availableWidth - 16  -- Set the width of the scroll bar
-        -- end
-
-        -- if (not width) then
-        --     local sub = height and 0 or 2
-        --     panel:SetWide(availableWidth / slots)  -- Distribute the width of the panels
-
-        --     -- Update width on layout
-        --     panel.PerformLayout = function()
-        --         panel:SetWide(availableWidth / slots)
-        --     end
-        -- end
-        if (not width) then
-            local sub = height and 0 or 1.4
-            panel:SetWide((self:GetWide() - margin * (slots - 1)) / slots - sub)
-            panel.PerformLayout = function ()
-                panel:SetWide((self:GetWide() - margin * (slots - 1)) / slots - sub)
+        -- Calculate width with scrollbar consideration
+        if not customWidth then
+            local availableWidth = self:GetAvailableWidth()
+            local totalMarginWidth = margin * math.max(0, slots - 1)
+            local cellWidth = math.max(10, (availableWidth - totalMarginWidth) / slots)
+            panel:SetWide(cellWidth)
+            panel.CustomWidth = false
+            
+            -- Dynamic width updating with proper calculations
+            panel.PerformLayout = function()
+                if not panel.CustomWidth then
+                    local newAvailableWidth = self:GetAvailableWidth()
+                    local newTotalMarginWidth = margin * math.max(0, slots - 1)
+                    local newCellWidth = math.max(10, (newAvailableWidth - newTotalMarginWidth) / slots)
+                    panel:SetWide(newCellWidth)
+                end
             end
+        else
+            panel.CustomWidth = true
+        end
+
+        if customHeight then
+            panel.CustomHeight = true
         end
 
         -- Store the panel in the row and cells
-        Table:Add(self.Rows[index].Items, panel)
-        Table:Add(self.Cells, panel)
+        DTable:Add(self.Rows[index].Items, panel)
+        DTable:Add(self.Cells, panel)
 
         -- Calculate the height of the row
-        self:CalculateRowHeight(self.Rows[index], height)
+        self:CalculateRowHeight(self.Rows[index])
     end
 
-    --- Calculates the heights of all rows in the grid panel.
+    -- Enhanced AddCell method
+    function PANEL:AddCell(panel, width, height, sortData)
+        -- Store sort data
+        if sortData then
+            panel.SortData = sortData
+        end
+
+        self:AddCellToGrid(panel, width, height)
+        self:UpdateScrollbarWidth()
+    end
+
+    -- Calculate the heights of all rows
     function PANEL:CalculateRows()
         for _, row in pairs(self.Rows) do
-            self:CalculateRowHeight(row)
+            if IsValid(row) then
+                self:CalculateRowHeight(row)
+            end
         end
     end
 
-    --- Automatically sizes the grid panel based on its contents.
-    -- @return The total height of the grid panel after sizing.
+    -- Auto-size the grid panel
     function PANEL:AutoSize()
-        local totalHeight = 0
-        for _, row in pairs(self.Rows) do
-            local height = 0
-            local bottomMargin = base:Scale(self:GetVerticalMargin())
-            
-            for _, cell in pairs(row.Items) do
-                height = math.max(height, cell:GetTall())
-            end
-            totalHeight = totalHeight + height + bottomMargin
-        end
-        totalHeight = math.max(0, totalHeight - base:Scale(self:GetVerticalMargin()))
+        local totalHeight = self:GetContentHeight()
 
         -- Respect the maximum height if set
         if (self:GetMaxHeight() and self:GetMaxHeight() ~= 0) then
-            totalHeight = math.min(totalHeight, base:Scale(self:GetMaxHeight()))
+            totalHeight = math.min(totalHeight, DBase:Scale(self:GetMaxHeight()))
         end
 
         self:SetTall(totalHeight)
 
         -- Adjust parent height if necessary
-        if (self:GetParent():GetName() == 'EditablePanel') then
-            self:GetParent():SetTall(totalHeight + self:GetTopMargin())
+        if (IsValid(self:GetParent()) and self:GetParent():GetName() == 'EditablePanel') then
+            self:GetParent():SetTall(totalHeight + (self:GetTopMargin() or 0))
         end
+
+        self:UpdateScrollbarWidth()
         return totalHeight
     end
 
-    --- Creates a new row for the grid panel.
-    -- @return The newly created row panel.
+    -- Create a new row
     function PANEL:CreateRow()
         local row = self:Add('EditablePanel')
         row:Dock(TOP)
-        row:DockMargin(0, 0, 0, base:Scale(self:GetVerticalMargin()))
+        row:DockMargin(0, 0, 0, DBase:Scale(self:GetVerticalMargin()))
         row.Paint = nil
         row.Items = {}
         return row
     end
 
-    --- Calculates the height of a specified row.
-    -- @param row The row for which to calculate the height.
+    -- Calculate the height of a row
     function PANEL:CalculateRowHeight(row)
+        if (not IsValid(row)) then
+            return
+        end
+        
         local height = 0
         for _, cell in pairs(row.Items) do
-            height = math.max(height, cell:GetTall())
+            if IsValid(cell) then
+                height = math.max(height, cell:GetTall())
+            end
         end
         row:SetTall(height)
     end
 
-    --- Skips a cell by adding an empty panel.
+    -- Skip a cell by adding an empty panel
     function PANEL:Skip()
-        local cell = DanLib.CustomUtils.Create()
+        local cell = DCustomUtils()
+        cell.Paint = function() end -- Make it invisible
         self:AddCell(cell)
     end
 
-    --- Clears all cells and rows from the grid panel.
+    -- Clear all cells and rows
     function PANEL:Clear()
+        self:StopAnimation()
+        
         for _, row in pairs(self.Rows) do
-            for _, cell in pairs(row.Items) do
-                cell:Remove()
+            if IsValid(row) then
+                for _, cell in pairs(row.Items) do
+                    if IsValid(cell) then
+                        cell:Remove()
+                    end
+                end
+                row:Remove()
             end
-            row:Remove()
         end
-        self.Cells, self.Rows = {}, {}
+        
+        self.Cells = {}
+        self.Rows = {}
+        self.SortData = {}
+        self.ScrollbarWidth = 0
     end
 
-    -- Ensure cleanup on removal
-    PANEL.OnRemove = PANEL.Clear
+    -- Enhanced Think method for scrollbar monitoring
+    local oldThink = PANEL.Think
+    function PANEL:Think()
+        if oldThink then
+            oldThink(self)
+        end
+        
+        -- Monitor content height changes
+        local currentContentHeight = self:GetContentHeight()
+        if (self.LastContentHeight ~= currentContentHeight) then
+            self.LastContentHeight = currentContentHeight
+            self:UpdateScrollbarWidth()
+        end
+    end
+
+    -- Override PerformLayout to handle scrollbar changes
+    local oldPerformLayout = PANEL.PerformLayout
+    function PANEL:PerformLayout(...)
+        if oldPerformLayout then oldPerformLayout(self, ...) end
+        self:UpdateScrollbarWidth()
+    end
+
+    -- Cleanup on removal
+    function PANEL:OnRemove()
+        self:StopAnimation()
+        self:Clear()
+    end
 
     return PANEL
 end
 
+-- Demo function (updated to show new features)
+local function gridDemo()
+    local Frame = DBase.CreateUIFrame()
+    Frame:SetSize(500, 500)
+    Frame:Center()
+    Frame:MakePopup()
+    Frame:SetTitle('Enhanced Grid Panel Demo')
 
+    local Grid = DBase.CreateGridPanel(Frame)
+    Grid:Pin(FILL, 10)
+    Grid:SetColumns(3)
+    Grid:SetHorizontalMargin(6)
+    Grid:SetVerticalMargin(6)
 
-
-
-
-local function grid()
-	local Frame = base.CreateUIFrame()
-	Frame:SetSize(400, 400)
-	Frame:Center()
-	Frame:MakePopup()
-	Frame:SetTitle('Grid panel')
-
-	local Grid = base.CreateGridPanel(Frame)
-    Grid:Dock(FILL)
-    Grid:DockMargin(5, 5, 5, 5)
-    Grid:SetColumns(3) -- Set how many columns will be used!
-    Grid:SetHorizontalMargin(4)
-    Grid:SetVerticalMargin(4)
-
-    for i = 1, 24 do
-      	local Panel = DanLib.CustomUtils.Create()
-      	Panel:SetTall(50)
-      	Panel.Paint = function(self, w, h)
-        	DanLib.Utils:DrawRect(0, 0, w, h, base:Theme('secondary_dark'))
-        	draw.SimpleText('Panel №'..i, 'danlib_font_18', w * 0.5, h * 0.5, base:Theme('text'), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-      	end
-      	Grid:AddCell(Panel, nil, true)
+    -- Add test panels with sort data
+    for i = 1, 30 do
+        local Panel = DCustomUtils()
+        Panel:SetTall(60)
+        Panel:ApplyBackground(DBase:Theme('secondary_dark'), 6)
+        Panel:ApplyEvent(nil, function(sl, w, h)
+            draw.SimpleText('Panel #' .. i, 'danlib_font_16', w * 0.5, h * 0.35, DBase:Theme('text'), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            draw.SimpleText('Value: ' .. (i * 7) % 100, 'danlib_font_14', w * 0.5, h * 0.65, DBase:Theme('title'), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        end)
+        
+        -- Add sort data
+        local sortData = {
+            index = i,
+            value = (i * 7) % 100,
+            name = 'Panel #' .. i
+        }
+        
+        Grid:AddCell(Panel, nil, nil, sortData)
     end
+
+    -- Add control buttons
+    local ButtonPanel = DCustomUtils(Frame)
+    ButtonPanel:Pin(BOTTOM)
+    ButtonPanel:SetTall(40)
+
+    local SortByIndex = ButtonPanel:Add('DButton')
+    SortByIndex:SetText('Sort by Index')
+    SortByIndex:SetWide(120)
+    SortByIndex:Dock(LEFT)
+    SortByIndex:DockMargin(5, 5, 5, 5)
+    SortByIndex.DoClick = function()
+        Grid:Sort(function(a, b) return a.index < b.index end)
+    end
+
+    local SortByValue = ButtonPanel:Add('DButton')
+    SortByValue:SetText('Sort by Value')
+    SortByValue:SetWide(120)
+    SortByValue:Dock(LEFT)
+    SortByValue:DockMargin(0, 5, 5, 5)
+    SortByValue.DoClick = function()
+        Grid:Sort(function(a, b) return a.value < b.value end)
+    end
+
+    local ReverseSort = ButtonPanel:Add('DButton')
+    ReverseSort:SetText('Reverse')
+    ReverseSort:SetWide(80)
+    ReverseSort:Dock(LEFT)
+    ReverseSort:DockMargin(0, 5, 5, 5)
+    ReverseSort.DoClick = function()
+        Grid:Sort(function(a, b) return a.index > b.index end)
+    end
+
+    local AnimateBtn = ButtonPanel:Add('DButton')
+    AnimateBtn:SetText('Animate')
+    AnimateBtn:SetWide(80)
+    AnimateBtn:Dock(LEFT)
+    AnimateBtn:DockMargin(0, 5, 5, 5)
+    AnimateBtn.DoClick = function()
+        Grid:StartAnimation()
+    end
+
+    Grid:StartAnimation()
 end
--- concommand.Add('CreateGridPanel', grid)	
+
+-- Uncomment to test
+-- gridDemo()
