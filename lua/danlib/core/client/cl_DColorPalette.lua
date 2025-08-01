@@ -43,7 +43,6 @@ local mouseDown = input.IsMouseDown
 
 
 --- https://github.com/Facepunch/garrysmod/blob/master/garrysmod/lua/vgui/drgbpicker.lua
-
 local PICKER, Constructor = DanLib.UiPanel()
 
 AccessorFunc(PICKER, 'm_RGB', 'RGB')
@@ -57,18 +56,19 @@ function PICKER:Init()
 end
 
 function PICKER:GetPosColor(x, y)
-	local con_x = (x / self:GetWide()) * self.Material:Width()
-	local con_y = (y / self:GetTall()) * self.Material:Height()
+    local con_x = (x / self:GetWide()) * self.Material:Width()
+    local con_y = (y / self:GetTall()) * self.Material:Height()
 
-	con_x = clamp(con_x, 0, self.Material:Width() - 1)
-	con_y = clamp(con_y, 0, self.Material:Height() - 1)
+    con_x = clamp(con_x, 0, self.Material:Width() - 1)
+    con_y = clamp(con_y, 0, self.Material:Height() - 1)
 
-	local col = self.Material:GetColor(con_x, con_y)
-	return col, con_x, con_y
+    return self.Material:GetColor(con_x, con_y), con_x, con_y
 end
 
 function PICKER:OnCursorMoved(x, y)
-	if (not mouseDown(MOUSE_LEFT)) then return end
+	if (not mouseDown(MOUSE_LEFT)) then
+		return
+	end
 
 	local col = self:GetPosColor(x, y)
 	if col then
@@ -113,9 +113,7 @@ PICKER:Register('DanLib.UI.RGBPicker')
 
 
 
-
 --- https://github.com/Facepunch/garrysmod/blob/master/garrysmod/lua/vgui/dalphabar.lua
-
 local BAR, Constructor = DanLib.UiPanel()
 
 AccessorFunc(BAR, 'm_Value', 'Value')
@@ -130,12 +128,15 @@ function BAR:Init()
 end
 
 function BAR:OnCursorMoved(x, y)
-	if (not mouseDown(MOUSE_LEFT)) then return end
-	local fHeight = y / self:GetTall()
-
-	fHeight = 1 - clamp(fHeight, 0, 1)
-	self:SetValue(fHeight)
-	self:OnChange(fHeight)
+    if (not mouseDown(MOUSE_LEFT)) then
+    	return
+    end
+    
+    local fHeight = y / self:GetTall()
+    fHeight = 1 - clamp(fHeight, 0, 1)
+    
+    self:SetValue(fHeight)
+    self:OnChange(fHeight)
 end
 
 function BAR:OnMousePressed(mcode)
@@ -174,9 +175,7 @@ BAR:Register('DanLib.UI.AlphaBar')
 
 
 
-
 --- https://github.com/Facepunch/garrysmod/blob/master/garrysmod/lua/vgui/dcolorcube.lua
-
 local CUBE, Constructor = DanLib.UiPanel()
 
 AccessorFunc(CUBE, 'm_Hue', 'Hue')
@@ -223,14 +222,14 @@ function CUBE:TranslateValues(x, y)
 end
 
 function CUBE:UpdateColor(x, y)
-	x = x or self:GetSlideX()
-	y = y or self:GetSlideY()
+    x = x or self:GetSlideX()
+    y = y or self:GetSlideY()
 
-	local value = 1 - y
-	local saturation = 1 - x
-	local h = ColorToHSV(self.m_BaseRGB)
-	local color = HSVToColor(h, saturation, value)
-	self:SetRGB(color)
+    local value = 1 - y
+    local saturation = 1 - x
+    local h = ColorToHSV(self.m_BaseRGB)
+    local color = HSVToColor(h, saturation, value)
+    self:SetRGB(color)
 end
 
 function CUBE:OnUserChanged(color)
@@ -254,44 +253,50 @@ CUBE:SetBase('DanLib.UI.Slider')
 CUBE:Register('DanLib.UI.ColorCube')
 
 
+
 -- https://github.com/Facepunch/garrysmod/blob/master/garrysmod/lua/vgui/dcolorpalette.lua
-
+--- Enhanced Color Palette with format-specific display
 local function CreateColorTable(num_rows)
-	local rows = num_rows or 8
-	local index = 0
-	local ColorTable = {}
+    local rows = num_rows or 8
+    local index = 0
+    local ColorTable = {}
 
-	for i = 0, rows * 2 - 1 do -- HSV
-		local col = round(min(i * (360 / (rows * 2)), 359))
-		index = index + 1
-		ColorTable[index] = toColor(360 - col, 1, 1)
-	end
+    -- HSV bright colors
+    for i = 0, rows * 2 - 1 do
+        local col = round(min(i * (360 / (rows * 2)), 359))
+        index = index + 1
+        ColorTable[index] = toColor(360 - col, 1, 1)
+    end
 
-	for i = 0, rows - 1 do -- HSV dark
-		local col = round(min(i * (360 / rows), 359))
-		index = index + 1
-		ColorTable[index] = toColor(360 - col, 1, 0.5)
-	end
+    -- HSV dark colors
+    for i = 0, rows - 1 do
+        local col = round(min(i * (360 / rows), 359))
+        index = index + 1
+        ColorTable[index] = toColor(360 - col, 1, 0.5)
+    end
 
-	for i = 0, rows - 1 do -- HSV grey
-		local col = round(min(i * (360 / rows), 359))
-		index = index + 1
-		ColorTable[index] = toColor(360 - col, 0.5, 0.5)
-	end
+    -- HSV medium saturation
+    for i = 0, rows - 1 do
+        local col = round(min(i * (360 / rows), 359))
+        index = index + 1
+        ColorTable[index] = toColor(360 - col, 0.5, 0.5)
+    end
 
-	for i = 0, rows - 1 do -- HSV bright
-		local col = min(i * (360 / rows), 359)
-		index = index + 1
-		ColorTable[index] = toColor(360 - col, 0.5, 1)
-	end
+    -- HSV high brightness
+    for i = 0, rows - 1 do
+        local col = min(i * (360 / rows), 359)
+        index = index + 1
+        ColorTable[index] = toColor(360 - col, 0.5, 1)
+    end
 
-	for i = 0, rows - 1 do -- Greyscale
-		local white = 255 - round(min(i * (256 / (rows - 1)), 255))
-		index = index + 1
-		ColorTable[index] = Color(white, white, white)
-	end
+    -- Grayscale gradient
+    for i = 0, rows - 1 do
+        local white = 255 - round(min(i * (256 / (rows - 1)), 255))
+        index = index + 1
+        ColorTable[index] = Color(white, white, white)
+    end
 
-	return ColorTable
+    return ColorTable
 end
 
 
@@ -317,18 +322,23 @@ end
 
 -- This stuff could be better
 function PALETTE:NetworkColorChange()
-	for id, pnl in pairs(g_ColorPalettePanels) do
-		if (not IsValid(pnl)) then table.remove(g_ColorPalettePanels, id) end
-	end
+    for id, pnl in pairs(g_ColorPalettePanels) do
+        if (not IsValid(pnl)) then 
+            table.remove(g_ColorPalettePanels, id) 
+        end
+    end
 
-	for id, pnl in pairs(g_ColorPalettePanels) do
-		if (not IsValid(pnl) or pnl == self) then continue end
-		local tab = {}
-		for pid, p in ipairs(self:GetChildren()) do
-			tab[p:GetID()] = p:GetColor()
-		end
-		pnl:SetColorButtons(tab)
-	end
+    for id, pnl in pairs(g_ColorPalettePanels) do
+        if (not IsValid(pnl) or pnl == self) then
+        	continue
+        end
+        
+        local tab = {}
+        for pid, p in ipairs(self:GetChildren()) do
+            tab[p:GetID()] = p:GetColor()
+        end
+        pnl:SetColorButtons(tab)
+    end
 end
 
 function PALETTE:DoClick(color, button)
@@ -342,36 +352,40 @@ end
 function PALETTE:PaintOver(w, h)
 	local childW = 0
 	for id, child in ipairs(self:GetChildren()) do
-		if (childW + child:GetWide() > w) then break end
+		if (childW + child:GetWide() > w) then
+			break
+		end
+
 		childW = childW + child:GetWide()
 	end
 end
 
+-- Enhanced color button setup with format awareness
 function PALETTE:SetColorButtons(tab)
-	self:Clear()
-	local formatRGB = self:GetFormatRGB()
-	-- print('format: ', formatRGB)
+    self:Clear()
+    local formatRGB = self:GetFormatRGB()
 
-	for i, color in pairs(tab or {}) do
-		local id = tonumber(i)
-		if (not id) then break end
-		local size = self:GetButtonSize()
-		-- addButton(self, color, self:GetButtonSize(), i, formatRGB)
-
-		local button = DanLib.CustomUtils.Create(self, 'DanLib.UI.ColorButton')
-		button:SetSize(size or 10, size or 10)
-		button:SetID(i)
-		button:SetFormatRGB(formatRGB or 'RGB')
-		-- print('formatRGB:', formatRGB)
-
-		button:SetColor(color or color_Error)
-		button:ApplyEvent('DoClick', function(sl)
-			local col = sl:GetColor() or color_Error
-			self:OnValueChanged(col)
-			self:DoClick(col, button)
-		end)
-	end
-	self:InvalidateLayout()
+    for i, color in pairs(tab or {}) do
+        local id = tonumber(i)
+        if (not id) then
+        	break
+        end
+        
+        local size = self:GetButtonSize()
+        local button = DanLib.CustomUtils.Create(self, 'DanLib.UI.ColorButton')
+        
+        button:SetSize(size or 10, size or 10)
+        button:SetID(i)
+        button:SetFormatRGB(formatRGB or 'RGB')
+        button:SetColor(color or color_Error)
+        button:ApplyEvent('DoClick', function(sl)
+            local col = sl:GetColor() or color_Error
+            self:OnValueChanged(col)
+            self:DoClick(col, button)
+        end)
+    end
+    
+    self:InvalidateLayout()
 end
 
 function PALETTE:SetButtonSize(val)
@@ -389,15 +403,25 @@ function PALETTE:SaveColor(btn, color)
 end
 
 function PALETTE:SetColor(newcol)
-	-- TODO: This should mark this colour as selected..
+    -- Mark selected color in palette
+    for _, child in ipairs(self:GetChildren()) do
+        if (IsValid(child) and child.GetColor) then
+            local childCol = child:GetColor()
+            if (childCol and childCol.r == newcol.r and childCol.g == newcol.g and childCol.b == newcol.b) then
+                child:SetSelected(true)
+            else
+                child:SetSelected(false)
+            end
+        end
+    end
 end
 
 function PALETTE:OnValueChanged(newcol)
-	-- For override
+    -- Override in parent
 end
 
 function PALETTE:OnRightClickButton(btn)
-	-- For override
+    -- Override in parent - can be used for color saving/management
 end
 
 PALETTE:SetBase('DIconLayout')
