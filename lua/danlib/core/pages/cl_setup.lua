@@ -17,17 +17,17 @@
 
 
 
-local base = DanLib.Func
-local utils = DanLib.Utils
-local Table = DanLib.Table
-local network = DanLib.Network
-local customUtils = DanLib.CustomUtils
+local DBase = DanLib.Func
+local DUtils = DanLib.Utils
+local DTable = DanLib.Table
+local DNetwork = DanLib.Network
+local DCustomUtils = DanLib.CustomUtils.Create
 
 local string = string
 local table = table
 local count = table.Count
 
-local SETUP = base.CreatePage(base:L('#settings'))
+local SETUP = DBase.CreatePage(DBase:L('#settings'))
 SETUP:SetOrder(5)
 SETUP:SetIcon(DanLib.Config.Materials['Settings'])
 SETUP:SetKeyboardInput(true)
@@ -37,14 +37,14 @@ SETUP:SetKeyboardInput(true)
 -- @param pPlayer Player|nil The player for whom access is being checked. If nil, LocalPlayer() is used.
 -- @return boolean Returns true if the player has access, otherwise false.
 function SETUP:AccessСheck(pPlayer)
-    return base.HasPermission(pPlayer or LocalPlayer(), 'AdminPages')
+    return DBase.HasPermission(pPlayer or LocalPlayer(), 'AdminPages')
 end
 
 
 --- Creates a settings panel.
 -- @param parent Panel The parent panel to which the settings panel will be added.
 function SETUP:Create(parent)
-    base:TutorialSequence(4, 4)
+    DBase:TutorialSequence(4, 4)
     local settings = parent:Add('DanLib.UI.Setup')
     settings:Dock(FILL)
 end 
@@ -74,24 +74,24 @@ end
 
 --- Creates the top header of the panel
 function SETUP:TopHeader()
-    self.header = customUtils.Create(self)
+    self.header = DCustomUtils(self)
     self.header:PinMargin(TOP, nil, nil, nil, 12)
     self.header:SetTall(46)
     self.header:ApplyShadow(10, false)
     self.header.icon = 24
     self.header.iconMargin = 14
     self.header:ApplyEvent(nil, function(sl, w, h)
-        utils:DrawRoundedBox(0, 0, w, h, base:Theme('secondary_dark'))
-        utils:DrawIcon(sl.iconMargin, h * .5 - sl.icon * 0.5, sl.icon, sl.icon, DanLib.Config.Materials['Settings'], base:Theme('mat', 150))
-        utils:DrawDualText(sl.iconMargin * 3.5, h / 2 - 2, base:L('#settings'), 'danlib_font_20', base:Theme('decor'), base:L('#settings.description'), self.defaultFont, base:Theme('text'), TEXT_ALIGN_LEFT, nil, w - 300)
+        DUtils:DrawRoundedBox(0, 0, w, h, DBase:Theme('secondary_dark'))
+        DUtils:DrawIcon(sl.iconMargin, h * .5 - sl.icon * 0.5, sl.icon, sl.icon, DanLib.Config.Materials['Settings'], DBase:Theme('mat', 150))
+        DUtils:DrawDualText(sl.iconMargin * 3.5, h / 2 - 2, DBase:L('#settings'), 'danlib_font_20', DBase:Theme('decor'), DBase:L('#settings.description'), self.defaultFont, DBase:Theme('text'), TEXT_ALIGN_LEFT, nil, w - 300)
     end)
 
     -- Defining the buttons for saving and cancelling
-    self.cancelButton = self:CreateButton(base:L('cancel'), Color(209, 53, 62), function()
+    self.cancelButton = self:CreateButton(DBase:L('cancel'), Color(209, 53, 62), function()
         DanLib.ChangedConfig = nil
         self:Refresh()
     end)
-    self.saveButton = self:CreateButton(base:L('save'), Color(67, 156, 242), function()
+    self.saveButton = self:CreateButton(DBase:L('save'), Color(67, 156, 242), function()
         self:HandleSave()
     end)
 end
@@ -103,8 +103,8 @@ end
 -- @param onClick: function The function to call when the button is clicked
 -- @return DButton: The created button
 function SETUP:CreateButton(name, color, onClick)
-    local buttonSize = utils:TextSize(name, self.defaultFont).w
-    local Button = base.CreateUIButton(self.header, {
+    local buttonSize = DUtils:TextSize(name, self.defaultFont).w
+    local Button = DBase.CreateUIButton(self.header, {
         background = { nil },
         dock_indent = { RIGHT, nil, 7, 6, 7 },
         wide = 14 + buttonSize,
@@ -122,9 +122,9 @@ end
 function SETUP:GetSortedConfig()
     local sortedConfig = {}
     for k, v in pairs(DanLib.ConfigMeta) do
-        Table:Add(sortedConfig, { v.SortOrder, k })
+        DTable:Add(sortedConfig, { v.SortOrder, k })
     end
-    Table:SortByMember(sortedConfig, 1, true) -- Sort by order
+    DTable:SortByMember(sortedConfig, 1, true) -- Sort by order
     return sortedConfig
 end
 
@@ -135,7 +135,7 @@ function SETUP:GetReset(moduleKey, key)
     
     -- Check if the module exists
     if (not module) then
-        base:PrintError('Module not found: ' .. moduleKey)
+        DBase:PrintError('Module not found: ' .. moduleKey)
         return
     end
 
@@ -154,12 +154,12 @@ function SETUP:GetReset(moduleKey, key)
         defaultValues = defaultValues
     else
         -- If it is not a table, string, or boolean, we print an error message
-        base:PrintError('A table, string, or boolean was expected but received: ' .. type(defaultValues))
+        DBase:PrintError('A table, string, or boolean was expected but received: ' .. type(defaultValues))
         return
     end
 
     -- Call the function to change the configuration
-    base:SetConfigVariable(moduleKey, key, defaultValues)
+    DBase:SetConfigVariable(moduleKey, key, defaultValues)
 end
 
 
@@ -169,8 +169,8 @@ function SETUP:PopulatePages()
     for k, config in pairs(sortedConfig) do
         local moduleKey = config[2]
         local module = DanLib.ConfigMeta[moduleKey]
-        local page = customUtils.Create(self.tabs)
-        local scrollPanel = customUtils.Create(page, 'DanLib.UI.Scroll')
+        local page = DCustomUtils(self.tabs)
+        local scrollPanel = DCustomUtils(page, 'DanLib.UI.Scroll')
         scrollPanel:Pin(FILL)
         page.scrollPanel = scrollPanel
 
@@ -187,21 +187,56 @@ function SETUP:PopulatePages()
             for key, val in pairs(module:GetSorted()) do
                 -- Set flag if variables are found
                 hasVariables = true
-                self:CreateVariablePanel(scrollPanel, val, moduleKey, module, sl)
+                
+                -- Check if this is a category separator
+                if val.IsSeparator then
+                    self:CreateCategorySeparator(scrollPanel, val)
+                else
+                    self:CreateVariablePanel(scrollPanel, val, moduleKey, module, sl)
+                end
             end
 
             -- Check if there are variables
             if (not hasVariables) then
                 -- Create a panel with a message
-                local emptyMessagePanel = customUtils.Create(page)
+                local emptyMessagePanel = DCustomUtils(page)
                 emptyMessagePanel:Pin(FILL)
-                emptyMessagePanel:ApplyText("There's nothing here", 'danlib_font_26', nil, nil, base:Theme('text'))
+                emptyMessagePanel:ApplyText("There's nothing here", 'danlib_font_26', nil, nil, DBase:Theme('text'))
             end
         end)
         self:AddPageModule(page, k, module, moduleKey) -- Adding a page to the public list
     end
 
     DanLib.Hook:Add('DanLib:HooksConfigUpdated', 'HooksConfigUpdated', function() self:Refresh() end)
+end
+
+
+--- Creates a category separator in the scrollable area
+-- @param scrollPanel: The scroll panel to add the separator to
+-- @param categoryData: The category data containing name and styling info
+function SETUP:CreateCategorySeparator(scrollPanel, categoryData)
+    local separatorHeight = 32
+    local separator = DCustomUtils(scrollPanel)
+    separator:PinMargin(TOP, nil, 4, 4, 4)
+    separator:SetTall(separatorHeight)
+    separator:ApplyEvent(nil, function(sl, w, h)
+        local categoryColor = categoryData.CategoryInfo and categoryData.CategoryInfo.Color or Color(67, 156, 242)
+        local categoryIcon = categoryData.CategoryInfo and categoryData.CategoryInfo.Icon
+        local categoryName = categoryData.CategoryInfo and categoryData.Name or DBase:L('#no.data')
+        
+        local textX = 8
+        local textY = h / 2
+        local iconSize = 16
+        local currentX = textX
+        if categoryIcon then
+            DUtils:DrawIconOrMaterial(currentX, h / 2 - iconSize / 2, iconSize, categoryIcon, categoryColor)
+            currentX = currentX + iconSize + 8
+        end
+        
+        -- Draw category name
+        local x = draw.SimpleText(categoryName, 'danlib_font_18', currentX, textY, categoryColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        DUtils:DrawRoundedBox(x + currentX + 8, h / 2, w, 4, DBase:Theme('secondary'))
+    end)
 end
 
 
@@ -214,22 +249,34 @@ end
 function SETUP:CreateVariablePanel(pages, val, moduleKey, module, sl)
     local headerH = 50
     local customElement = val.Type == DanLib.Type.Table and val.VguiElement
-    local variablePanel = customUtils.Create(pages)
+    local variablePanel = DCustomUtils(pages)
     variablePanel:PinMargin(TOP, nil, nil, 4, 8)
     variablePanel:SetTall(headerH)
     variablePanel:ApplyEvent(nil, function(sl, w, h)
-        utils:DrawRoundedBox(0, 0, w, h, base:Theme('secondary', 150))
+        DUtils:DrawRoundedBox(0, 0, w, h, DBase:Theme('secondary', 150))
         sl:ApplyAlpha(false, 0, 0.5, false, sl.undercolor, 255, 0.5)
-        utils:DrawRoundedBox(0, 0, w, h, Color(46, 62, 82, sl.alpha))
-        utils:DrawDualText(10, headerH / 2 - 2, val.Name or nil, self.defaultFont, base:Theme('decor'), val.Description or nil, self.defaultFont, base:Theme('text'), TEXT_ALIGN_LEFT, nil, w - 210)
+        DUtils:DrawRoundedBox(0, 0, w, h, Color(46, 62, 82, sl.alpha))
+        DUtils:DrawDualText(10, headerH / 2 - 2, val.Name or nil, self.defaultFont, DBase:Theme('decor'), val.Description or nil, self.defaultFont, DBase:Theme('text'), TEXT_ALIGN_LEFT, nil, w - 210)
     end)
+
+    -- Add help text tooltip functionality if HelpText is provided
+    if val.HelpText then
+        local x = DUtils:TextSize(val.Name, self.defaultFont).w
+        local HelpPanel = DCustomUtils(variablePanel)
+        HelpPanel:SetPos(x + 16, 6)
+        HelpPanel:SetSize(16, 16)
+        HelpPanel:ApplyTooltip(val.HelpText, nil, nil, TOP)
+        HelpPanel:ApplyEvent(nil, function(sl, w, h)
+            DUtils:DrawIcon(0, 0, w, h, DanLib.Config.Materials['Help'] or DanLib.Config.Materials['Info'], DBase:Theme('mat', 100))
+        end)
+    end
 
     -- Adding functionality depending on the type of variable
     self:AddVariableFunctionality(variablePanel, customElement, val, moduleKey, module, sl)
 end
 
 
---- Adds functionality to a variable panel based on its type
+--- Adds functionality to a variable panel DBased on its type
 -- @param variablePanel Panel: The variable panel to add functionality to
 -- @param customElement string: The custom element type (if any)
 -- @param val table: The variable configuration
@@ -246,7 +293,7 @@ function SETUP:AddVariableFunctionality(variablePanel, customElement, val, modul
     if (customElement or val.GetOptions) then
         if val.GetOptions then
             local options = val.GetOptions()
-            local comboSelect = base.CreateUIComboBox(variablePanel)
+            local comboSelect = DBase.CreateUIComboBox(variablePanel)
             comboSelect:CustomUtils()
             comboSelect:Dock(RIGHT)
             comboSelect:DockMargin(0, margin, margiMoveToRight, margin)
@@ -258,50 +305,56 @@ function SETUP:AddVariableFunctionality(variablePanel, customElement, val, modul
             end
             comboSelect:ApplyEvent('OnSelect', function(_, index, value, data)
                 print(moduleKey, val.Key, data)
-                base:SetConfigVariable(moduleKey, val.Key, data)
+                DBase:SetConfigVariable(moduleKey, val.Key, data)
             end)
         else
-            local button = base.CreateUIButton(variablePanel, {
+            local button = DBase.CreateUIButton(variablePanel, {
                 dock_indent = { RIGHT, nil, margin, margiMoveToRight, margin },
                 wide = 32,
                 icon = { DanLib.Config.Materials['Edit'] },
-                tooltip = { base:L('#edit'), nil, nil, TOP },
+                tooltip = { DBase:L('#edit'), nil, nil, TOP },
                 click = function(sl)
                     if ui:valid(sl.con) then sl.con:Remove() return end
-                    local Container = customUtils.Create(nil, val.VguiElement)
+                    local Container = DCustomUtils(nil, val.VguiElement)
                     sl.con = Container
                     Container:FillPanel()
                 end
             })
         end
     elseif (val.Type == DanLib.Type.Int) then
-        local numberWang = base.CreateNumberWang(variablePanel)
+        local numberWang = DBase.CreateNumberWang(variablePanel)
         numberWang:PinMargin(RIGHT, nil, margin, margiMoveToRight, margin)
         numberWang:SetWide(wide)
-        numberWang:SetHighlightColor(base:Theme('secondary', 50))
+        numberWang:SetHighlightColor(DBase:Theme('secondary', 50))
         numberWang:SetValue(module:GetValue(val.Key))
         numberWang:DisableShadows()
+
+        -- Set the minimum and maximum values, if specified
+        if (val.MinValue ~= nil and val.MaxValue ~= nil) then
+            numberWang:SetMinMax(val.MinValue, val.MaxValue)
+        end
+
         numberWang:ApplyEvent('OnChange', function()
-            base:SetConfigVariable(moduleKey, val.Key, numberWang:GetValue())
+            DBase:SetConfigVariable(moduleKey, val.Key, numberWang:GetValue())
         end)
     elseif (val.Type == DanLib.Type.String) then
-        local textEntry = base.CreateTextEntry(variablePanel)
+        local textEntry = DBase.CreateTextEntry(variablePanel)
         textEntry:PinMargin(RIGHT, nil, margin, margiMoveToRight, margin)
         textEntry:SetWide(wide)
-        textEntry:SetHighlightColor(base:Theme('secondary', 50))
+        textEntry:SetHighlightColor(DBase:Theme('secondary', 50))
         textEntry:SetValue(module:GetValue(val.Key) or '')
         textEntry:DisableShadows()
         textEntry:ApplyEvent('OnChange', function()
-            base:SetConfigVariable(moduleKey, val.Key, textEntry:GetValue())
+            DBase:SetConfigVariable(moduleKey, val.Key, textEntry:GetValue())
         end)
     elseif (val.Type == DanLib.Type.Bool) then
-        local CheckBox = base.CreateCheckbox(variablePanel)
+        local CheckBox = DBase.CreateCheckbox(variablePanel)
         CheckBox:PinMargin(RIGHT, nil, margin, margiMoveToRight, margin)
         CheckBox:SetWide(32)
         CheckBox:SetValue(module:GetValue(val.Key))
         CheckBox:DisableShadows()
         CheckBox:ApplyEvent('OnChange', function(_, value)
-            base:SetConfigVariable(moduleKey, val.Key, value)
+            DBase:SetConfigVariable(moduleKey, val.Key, value)
         end)
     end
 
@@ -316,7 +369,7 @@ end
 -- @param variablePanel Panel: The variable panel to add the action button to
 -- @param val table: The variable configuration
 function SETUP:CreateActionButton(variablePanel, val)
-    local button = base.CreateUIButton(variablePanel, {
+    DBase.CreateUIButton(variablePanel, {
         dock_indent = { RIGHT, nil, 10, 15 - 4, 10 },
         wide = 32,
         icon = { DanLib.Config.Materials['Info'] },
@@ -325,7 +378,7 @@ function SETUP:CreateActionButton(variablePanel, val)
             if (type(val.Action) == 'function') then
                 val.Action()  -- If it is a function, call it
             elseif (type(val.Action) == 'string') then
-                customUtils.Create(nil, val.Action)  -- Register an item with vgui
+                DCustomUtils(nil, val.Action)  -- Register an item with vgui
             end
         end
     })
@@ -333,11 +386,11 @@ end
 
 
 function SETUP:CreateResetButton(variablePanel, moduleKey, Key)
-    local button = base.CreateUIButton(variablePanel, {
+    DBase.CreateUIButton(variablePanel, {
         dock_indent = { RIGHT, nil, 10, 15 - 4, 10 },
         wide = 32,
         icon = { DanLib.Config.Materials['Reset'] },
-        tooltip = { base:L('#resetting.changes'), nil, nil, TOP },
+        tooltip = { DBase:L('#resetting.changes'), nil, nil, TOP },
         click = function()
             self:GetReset(moduleKey, Key)
         end
@@ -364,7 +417,7 @@ function SETUP:AddPageModule(panel, id, configMeta, moduleKey)
     self.pages[key] = panel
 
     local tab = self.tabs
-    local text_wrap = utils:TextWrap(configMeta.Description, nil, 200)
+    local text_wrap = DUtils:TextWrap(configMeta.Description, nil, 200)
     local c = tab:AddTab(panel, configMeta.Title, text_wrap, nil, configMeta.Color)
     tab.TabID[id] = c
 end
@@ -402,21 +455,29 @@ end
 -- @param key string: Change key for selection
 function SETUP:GotoOnPage(index, key)
     local page = self:ScrollPageByID(index)
-    if (not ui:valid(page)) then return end
+    if (not ui:valid(page)) then
+        return
+    end
 
     local variablePanel = page.variablePanels[key]
-    if (not ui:valid(variablePanel)) then return end
+    if (not ui:valid(variablePanel)) then
+        return
+    end
 
-    base:TimerSimple(nil, function() 
+    DBase:TimerSimple(nil, function() 
         page.scrollPanel:ScrollToChild(variablePanel) 
     end)
 
-    base:TimerSimple(1.2, function()
-        if (not ui:valid(variablePanel)) then return end
+    DBase:TimerSimple(1.2, function()
+        if (not ui:valid(variablePanel)) then
+            return
+        end
         variablePanel.undercolor = true
 
-        base:TimerSimple(1, function()
-            if (not ui:valid(variablePanel)) then return end
+        DBase:TimerSimple(1, function()
+            if (not ui:valid(variablePanel)) then
+                return
+            end
             variablePanel.undercolor = false
         end)
     end)
@@ -425,26 +486,28 @@ end
 
 --- Handles saving the configuration changes
 function SETUP:HandleSave()
-    if (not DanLib.ChangedConfig or Table:Count(DanLib.ChangedConfig) <= 0) then return end
+    if (not DanLib.ChangedConfig or DTable:Count(DanLib.ChangedConfig) <= 0) then
+        return
+    end
 
-    network:Start('DanLib:RequestSaveConfigChanges')
-    network:WriteUInt(Table:Count(DanLib.ChangedConfig), 5)
+    DNetwork:Start('DanLib:RequestSaveConfigChanges')
+    DNetwork:WriteUInt(DTable:Count(DanLib.ChangedConfig), 5)
 
     for k, v in pairs(DanLib.ChangedConfig) do
-        network:WriteString(k)
-        network:WriteUInt(Table:Count(v), 5)
+        DNetwork:WriteString(k)
+        DNetwork:WriteUInt(DTable:Count(v), 5)
 
         for key, val in pairs(v) do
-            network:WriteString(key)
-            local variableType = base.GetConfigType(k, key)
-            base.ProcessTypeValue(variableType, val, true)
+            DNetwork:WriteString(key)
+            local variableType = DBase.GetConfigType(k, key)
+            DBase.ProcessTypeValue(variableType, val, true)
         end
     end
 
-    network:SendToServer()
+    DNetwork:SendToServer()
     DanLib.ChangedConfig = nil
     self:Refresh()
-    base:TutorialSequence(5, 1)
+    DBase:TutorialSequence(5, 1)
 end
 
 
@@ -453,7 +516,7 @@ end
 -- @return nil
 function SETUP:CheckForUnsavedChanges()
     -- Checking for unsaved changes
-    local hasChanges = DanLib.ChangedConfig and Table:Count(DanLib.ChangedConfig) > 0
+    local hasChanges = DanLib.ChangedConfig and DTable:Count(DanLib.ChangedConfig) > 0
     if hasChanges then
         -- Get the first unsaved setting
         local firstKey, firstChange = next(DanLib.ChangedConfig)
@@ -471,7 +534,7 @@ end
 --- Think function to check for changes and update button states
 function SETUP:Think()
     -- Check for changes and update the state of the buttons
-    local hasChanges = DanLib.ChangedConfig and Table:Count(DanLib.ChangedConfig) > 0
+    local hasChanges = DanLib.ChangedConfig and DTable:Count(DanLib.ChangedConfig) > 0
     self.cancelButton:SetEnabled(hasChanges)
     self.saveButton:SetEnabled(hasChanges)
 
