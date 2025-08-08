@@ -17,10 +17,10 @@
  
 
 
-local base = DanLib.Func
-local utils = DanLib.Utils
+local DBase = DanLib.Func
+local DUtils = DanLib.Utils
 
-function base.CreateNumberWang(parent)
+function DBase.CreateNumberWang(parent)
 	local Number = DanLib.CustomUtils.Create(parent)
 
 	Number.numberWang = DanLib.CustomUtils.Create(Number, 'DNumberWang')
@@ -31,10 +31,13 @@ function base.CreateNumberWang(parent)
 	Number.numberWang:SetTextColor(Color(255, 255, 255, 20))
 	Number.numberWang:SetCursorColor(Color(255, 255, 255))
 	Number.numberWang:SetMinMax(0, 99999999)
-	Number.numberWang.backTextColor = base:Theme('secondary_dark', 100)
+	Number.numberWang.backTextColor = DBase:Theme('secondary_dark', 100)
 	Number.numberWang:ApplyClearPaint()
 	Number.numberWang:ApplyEvent(nil, function(sl, w, h)
-		if (sl:GetTextColor().a != 255 or sl:GetTextColor().a != 0) then sl:SetTextColor(Color(255, 255, 255, 100 + (Number.alpha or 0))) end
+		if (sl:GetTextColor().a != 255 or sl:GetTextColor().a != 0) then
+			sl:SetTextColor(Color(255, 255, 255, 100 + (Number.alpha or 0)))
+		end
+
 		if (sl.GetPlaceholderText && sl.GetPlaceholderColor && sl:GetPlaceholderText() && sl:GetPlaceholderText():Trim() != '' && sl:GetPlaceholderColor() && (not sl:GetText() or sl:GetText() == '')) then
 			local oldText = sl:GetText()
 			local str = sl:GetPlaceholderText()
@@ -71,16 +74,42 @@ function base.CreateNumberWang(parent)
         end
     end
 
-	function Number.numberWang:OnLoseFocus()
-		base:TimerSimple(0, function() 
-			if (not IsValid(self)) then return end
-			self:SetValue(math.Clamp(self:GetValue(), self:GetMin(), self:GetMax())) 
-		end)
+	-- Enhanced OnLoseFocus with MinMax support
+    function Number.numberWang:OnLoseFocus()
+        DBase:TimerSimple(0, function() 
+            if (not IsValid(self)) then
+            	return
+            end
+            
+            -- Check if field is empty and MinMax is set
+            local currentText = self:GetText()
+            if (not currentText or currentText:Trim() == '') then
+                -- If MinMax was set via SetMinMax and minimum is greater than 0, use minimum
+                -- Otherwise use 0 as default
+                local minValue = self:GetMin()
+                if (minValue and minValue > 0) then
+                    self:SetValue(minValue)
+                else
+                    self:SetValue(0)
+                end
+            else
+                -- Normal clamp behavior for non-empty values
+                self:SetValue(math.Clamp(self:GetValue(), self:GetMin(), self:GetMax()))
+            end
+        end)
 
-        if (Number.OnLoseFocus) then Number:OnLoseFocus() end
+        if (Number.OnLoseFocus) then
+        	Number:OnLoseFocus()
+        end
     end
 
-	function Number:SetMinMax(min, max) self.numberWang:SetMinMax(min, max) end
+	function Number:SetMinMax(min, max) 
+        self.numberWang:SetMinMax(min, max)
+        -- Store the min/max values for reference
+        self._minValue = min
+        self._maxValue = max
+    end
+
 	function Number:SetValue(val) self.numberWang:SetValue(val) end
 	function Number:GetValue() return self.numberWang:GetValue() end
 	function Number:SetBackColor(color) self.backColor = color end
@@ -100,9 +129,9 @@ function base.CreateNumberWang(parent)
 		end
 
 		local hoverPercent = self.hoverPercent / 100
-		utils:DrawRect(0, 0, w, h, base:Theme('decor_elements'))
-		utils:OutlinedRect(0, 0, w, h, base:Theme('frame'))
-		utils:OutlinedRect(0, 0, w, h, base:Theme('decor', hoverPercent * 100))
+		DUtils:DrawRect(0, 0, w, h, DBase:Theme('decor_elements'))
+		DUtils:OutlinedRect(0, 0, w, h, DBase:Theme('frame'))
+		DUtils:OutlinedRect(0, 0, w, h, DBase:Theme('decor', hoverPercent * 100))
 	end
 
 	return Number
@@ -114,8 +143,8 @@ end
 -- @param text (string): The text to be displayed on the slider. If not specified, an empty value will be used.
 -- @param colour (Color): The colour of the slider text. If not specified, the default theme is used.
 -- @return Slider (DNumSlider): The slider element created.
-function base.CreateNumSlider(parent, text, color)
-	color = color or base:Theme('text')
+function DBase.CreateNumSlider(parent, text, color)
+	color = color or DBase:Theme('text')
 	local alpha = 0
 
 	local Slider = DanLib.CustomUtils.Create(parent, 'DNumSlider')
@@ -135,8 +164,8 @@ function base.CreateNumSlider(parent, text, color)
 	end
 
     Slider.Slider.Paint = function(sl, w, h)
-        utils:DrawRect(8, h / 2, select(1, Slider.Slider.Knob:GetPos()), 2, Color(0, 136, 209))
-        utils:DrawRect(select(1, Slider.Slider.Knob:GetPos()), h / 2, w - 13 - select(1, Slider.Slider.Knob:GetPos()), 2, Color(160, 160, 160))
+        DUtils:DrawRect(8, h / 2, select(1, Slider.Slider.Knob:GetPos()), 2, Color(0, 136, 209))
+        DUtils:DrawRect(select(1, Slider.Slider.Knob:GetPos()), h / 2, w - 13 - select(1, Slider.Slider.Knob:GetPos()), 2, Color(160, 160, 160))
     end
 
     Slider.Slider.Knob:SetSize(14, 14)
