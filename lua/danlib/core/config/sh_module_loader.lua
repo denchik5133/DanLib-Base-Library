@@ -37,7 +37,9 @@
 -- @param variable: The name of the variable whose type is to be retrieved.
 -- @return string: Returns the type of the variable or nil if no module or variable is found.
 function DanLib.Func.GetConfigType(module, variable)
-    if (not DanLib.ConfigMeta[module] or not DanLib.ConfigMeta[module].Variables) then return end
+    if (not DanLib.ConfigMeta[module] or not DanLib.ConfigMeta[module].Variables) then
+        return
+    end
     return DanLib.ConfigMeta[module].Variables[variable].Type
 end
 
@@ -47,7 +49,9 @@ end
 -- @param value: The value to be copied.
 -- @return any: Returns the copied value or the original value if no type is found.
 function DanLib.Func.CopyTypeValue(type, value)
-    if (not type or not DanLib.FunctionType[type] or not DanLib.FunctionType[type].CopyFunc) then return value end
+    if (not type or not DanLib.FunctionType[type] or not DanLib.FunctionType[type].CopyFunc) then
+        return value
+    end
     return DanLib.FunctionType[type].CopyFunc(value)
 end
 
@@ -58,7 +62,9 @@ end
 -- @param isWrite: Flag indicating whether the value should be written (true) or read (false).
 -- @return any: Returns the read value if isWrite is false.
 function DanLib.Func.ProcessTypeValue(type, value, isWrite)
-    if (not type or not DanLib.FunctionType[type]) then return end
+    if (not type or not DanLib.FunctionType[type]) then
+        return
+    end
     
     if isWrite then
         DanLib.FunctionType[type].NetWrite(value)
@@ -69,7 +75,52 @@ end
 
 
 -- MODULE META
-DanLib.ConfigMeta = {}
+DanLib.ConfigMeta = DanLib.ConfigMeta or {}
+DanLib.CategoryRegistry = DanLib.CategoryRegistry or {}
+
+-- Option configuration object metatable
+local OptionConfigMeta = {
+    --- Sets minimum and maximum values for Int type options.
+    -- @param min: Minimum allowed value.
+    -- @param max: Maximum allowed value.
+    -- @return self: Returns self for continued chaining with SetHelp.
+    SetMinMax = function(self, min, max)
+        if (self.Type ~= DanLib.Type.Int) then
+            print('ERROR: SetMinMax can only be used with Int type options')
+            return self.Parent
+        end
+
+        if (type(min) ~= 'number' or type(max) ~= 'number') then
+            print('ERROR: SetMinMax requires numeric min and max values')
+            return self.Parent
+        end
+
+        if (min > max) then
+            print('ERROR: SetMinMax: minimum value cannot be greater than maximum value')
+            return self.Parent
+        end
+        
+        -- Store the values directly in the parent module's Variables table
+        self.Parent.Variables[self.VariableName].MinValue = min
+        self.Parent.Variables[self.VariableName].MaxValue = max
+        return self -- Return self to allow chaining SetHelp
+    end,
+
+    --- Sets help text that will be displayed as a tooltip on hover.
+    -- @param helpText: Help text to display on hover.
+    -- @return parent: Returns the parent module object for continued chaining.
+    SetHelp = function(self, helpText)
+        if (type(helpText) ~= 'string') then
+            print('ERROR: SetHelp requires a string parameter')
+            return self.Parent
+        end
+        
+        -- Store the help text directly in the parent module's Variables table
+        self.Parent.Variables[self.VariableName].HelpText = helpText
+        return self.Parent -- Return parent to allow chaining AddOption
+    end
+}
+OptionConfigMeta.__index = OptionConfigMeta
 
 local ConfigModuleMeta = {
 	--- Registers the module in the configuration metadata.
@@ -155,7 +206,35 @@ local ConfigModuleMeta = {
         return self
 	end,
 
-	--- Adds an option to the module.
+	--- Adds a category with custom properties and returns category object.
+    -- @param categoryName: Name of the category.
+    -- @param categoryColor: Color for the category (optional).
+    -- @param categoryIcon: Icon for the category (optional).
+    -- @return CategoryObject: Returns a category object for chaining AddOption calls.
+    AddCategory = function(self, categoryName, categoryColor, categoryIcon)
+        if (not DanLib.CategoryRegistry[categoryName]) then
+            DanLib.CategoryRegistry[categoryName] = {
+                Name = categoryName,
+                Color = categoryColor or Color(67, 156, 242), -- Default blue color
+                Icon = categoryIcon or nil,
+                Order = table.Count(DanLib.CategoryRegistry) + 1
+            }
+        end
+        
+        -- Create category object
+        local categoryObj = {
+            Name = categoryName,
+            Module = self,
+            AddOption = function(catSelf, variable, name, description, type, default, vguiElement, getOptions, action)
+                -- Delegate to main AddOption with category parameter
+                return self:AddOption(variable, name, description, type, default, vguiElement, getOptions, action, categoryName)
+            end
+        }
+        
+        return categoryObj
+    end,
+
+    --- Adds an option to the module and returns a chainable option configuration object.
     -- @param variable: Variable name.
     -- @param name: The name of the option.
     -- @param description: Description of the option.
@@ -165,33 +244,94 @@ local ConfigModuleMeta = {
     -- @param getOptions: Function to get options.
     -- @param action: Function to execute or string to register with vgui.
     -- @return self: Returns the current module object for the call chain.
-	AddOption = function(self, variable, name, description, type, default, vguiElement, getOptions, action)
+    AddOption = function(self, variable, name, description, type, default, vguiElement, getOptions, action, category)
         self.Variables[variable] = {
-			Name = name,
-			Description = description,
-			Type = type,
-			VguiElement = vguiElement or (type == DanLib.Type.Table && 'EditablePanel'),
-			GetOptions = getOptions,
-			Default = default,
-			Action = action or nil,
-			Order = table.Count(self.Variables) + 1
-		}
-        return self
-	end,
+            Name = name,
+            Description = description,
+            Type = type,
+            VguiElement = vguiElement or (type == DanLib.Type.Table && 'EditablePanel'),
+            GetOptions = getOptions,
+            Default = default,
+            Action = action or nil,
+            Order = table.Count(self.Variables) + 1,
+            Category = category or nil
+        }
 
-	--- Gets the sorted module variables.
-    -- @return table: Returns a table of sorted variables.
-	GetSorted = function(self)
-		local sortedVariables = {}
+        -- Create chainable option configuration object
+        local optionConfig = {
+            Parent = self,
+            VariableName = variable,
+            Type = type
+        }
+        
+        setmetatable(optionConfig, OptionConfigMeta)
+
+        return optionConfig
+    end,
+
+    --- Gets the sorted module variables with category grouping.
+    -- @return table: Returns a table of sorted variables grouped by categories.
+    GetSorted = function(self)
+        local sortedVariables = {}
+        local categorizedVars = {}
+        local uncategorizedVars = {}
+        
+        -- Separate variables into categorized and uncategorized
         for k, v in pairs(self.Variables) do
-			local data = v
-			data.Key = k
-			table.insert(sortedVariables, data)
-		end
-		table.SortByMember(sortedVariables, 'Order', true)
+            local data = {}
+            for key, value in pairs(v) do
+                data[key] = value
+            end
+            data.Key = k
+            
+            if v.Category then
+                if (not categorizedVars[v.Category]) then
+                    categorizedVars[v.Category] = {}
+                end
+                table.insert(categorizedVars[v.Category], data)
+            else
+                table.insert(uncategorizedVars, data)
+            end
+        end
+        
+        -- Sort uncategorized variables first (maintain existing behavior)
+        table.SortByMember(uncategorizedVars, 'Order', true)
+        for _, var in ipairs(uncategorizedVars) do
+            table.insert(sortedVariables, var)
+        end
+        
+        -- Sort categories by their registration order
+        local sortedCategories = {}
+        for categoryName, vars in pairs(categorizedVars) do
+            local categoryInfo = DanLib.CategoryRegistry and DanLib.CategoryRegistry[categoryName]
+            table.insert(sortedCategories, {
+                Name = categoryName,
+                Variables = vars,
+                Order = categoryInfo and categoryInfo.Order or 999,
+                Info = categoryInfo
+            })
+        end
+        table.SortByMember(sortedCategories, 'Order', true)
+        
+        -- Add categorized variables with separators
+        for _, category in ipairs(sortedCategories) do
+            -- Add category separator
+            table.insert(sortedVariables, {
+                Type = 'CategorySeparator',
+                Name = category.Name,
+                CategoryInfo = category.Info,
+                IsSeparator = true
+            })
+            
+            -- Sort variables within category
+            table.SortByMember(category.Variables, 'Order', true)
+            for _, var in ipairs(category.Variables) do
+                table.insert(sortedVariables, var)
+            end
+        end
 
-		return sortedVariables
-	end,
+        return sortedVariables
+    end,
 
 	--- Gets the default value for the variable.
     -- @param variable: The name of the variable.
