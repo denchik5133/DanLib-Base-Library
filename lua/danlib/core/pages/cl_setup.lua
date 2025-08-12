@@ -22,6 +22,7 @@ local DUtils = DanLib.Utils
 local DTable = DanLib.Table
 local DNetwork = DanLib.Network
 local DCustomUtils = DanLib.CustomUtils.Create
+local DMaterials = DanLib.Config.Materials
 
 local string = string
 local table = table
@@ -29,7 +30,7 @@ local count = table.Count
 
 local SETUP = DBase.CreatePage(DBase:L('#settings'))
 SETUP:SetOrder(5)
-SETUP:SetIcon(DanLib.Config.Materials['Settings'])
+SETUP:SetIcon(DMaterials['Settings'])
 SETUP:SetKeyboardInput(true)
 
 
@@ -82,7 +83,7 @@ function SETUP:TopHeader()
     self.header.iconMargin = 14
     self.header:ApplyEvent(nil, function(sl, w, h)
         DUtils:DrawRoundedBox(0, 0, w, h, DBase:Theme('secondary_dark'))
-        DUtils:DrawIcon(sl.iconMargin, h * .5 - sl.icon * 0.5, sl.icon, sl.icon, DanLib.Config.Materials['Settings'], DBase:Theme('mat', 150))
+        DUtils:DrawIcon(sl.iconMargin, h * .5 - sl.icon * 0.5, sl.icon, sl.icon, DMaterials['Settings'], DBase:Theme('mat', 150))
         DUtils:DrawDualText(sl.iconMargin * 3.5, h / 2 - 2, DBase:L('#settings'), 'danlib_font_20', DBase:Theme('decor'), DBase:L('#settings.description'), self.defaultFont, DBase:Theme('text'), TEXT_ALIGN_LEFT, nil, w - 300)
     end)
 
@@ -247,6 +248,8 @@ end
 -- @param module table: The module object
 -- @param sl table: Reference to the current setup object
 function SETUP:CreateVariablePanel(pages, val, moduleKey, module, sl)
+    print(val.Type)
+
     local headerH = 50
     local customElement = val.Type == DanLib.Type.Table and val.VguiElement
     local variablePanel = DCustomUtils(pages)
@@ -256,18 +259,35 @@ function SETUP:CreateVariablePanel(pages, val, moduleKey, module, sl)
         DUtils:DrawRoundedBox(0, 0, w, h, DBase:Theme('secondary', 150))
         sl:ApplyAlpha(false, 0, 0.5, false, sl.undercolor, 255, 0.5)
         DUtils:DrawRoundedBox(0, 0, w, h, Color(46, 62, 82, sl.alpha))
-        DUtils:DrawDualText(10, headerH / 2 - 2, val.Name or nil, self.defaultFont, DBase:Theme('decor'), val.Description or nil, self.defaultFont, DBase:Theme('text'), TEXT_ALIGN_LEFT, nil, w - 210)
+
+        -- The size of the input element by type
+        local inputWidth = 300
+        if (val.Type == DanLib.Type.Int or val.Type == DanLib.Type.String) then
+            inputWidth = 270
+        elseif (val.Type == DanLib.Type.Bool) then
+            inputWidth = 105
+        end
+
+        -- Size of the action button (if any)
+        local actionButtonWidth = 0
+        if val.Action then
+            actionButtonWidth = 32 + 10 -- 32px button + 10px indentation
+        end
+
+        -- The total width of the text is subtracted from the total width of the input field, the button, and the margins.
+        local margin = w - inputWidth - actionButtonWidth
+        DUtils:DrawDualText(10, headerH / 2 - 2, val.Name or nil, self.defaultFont, DBase:Theme('decor'), val.Description or nil, self.defaultFont, DBase:Theme('text'), TEXT_ALIGN_LEFT, nil, margin)
     end)
 
     -- Add help text tooltip functionality if HelpText is provided
     if val.HelpText then
         local x = DUtils:TextSize(val.Name, self.defaultFont).w
         local HelpPanel = DCustomUtils(variablePanel)
-        HelpPanel:SetPos(x + 16, 6)
-        HelpPanel:SetSize(16, 16)
+        HelpPanel:SetPos(x + 14, 6)
+        HelpPanel:SetSize(14, 14)
         HelpPanel:ApplyTooltip(val.HelpText, nil, nil, TOP)
         HelpPanel:ApplyEvent(nil, function(sl, w, h)
-            DUtils:DrawIcon(0, 0, w, h, DanLib.Config.Materials['Help'] or DanLib.Config.Materials['Info'], DBase:Theme('mat', 100))
+            DUtils:DrawIcon(0, 0, w, h, DMaterials['Help'] or DMaterials['Info'], DBase:Theme('mat', 100))
         end)
     end
 
@@ -308,10 +328,10 @@ function SETUP:AddVariableFunctionality(variablePanel, customElement, val, modul
                 DBase:SetConfigVariable(moduleKey, val.Key, data)
             end)
         else
-            local button = DBase.CreateUIButton(variablePanel, {
+            DBase.CreateUIButton(variablePanel, {
                 dock_indent = { RIGHT, nil, margin, margiMoveToRight, margin },
                 wide = 32,
-                icon = { DanLib.Config.Materials['Edit'] },
+                icon = { DMaterials['Edit'] },
                 tooltip = { DBase:L('#edit'), nil, nil, TOP },
                 click = function(sl)
                     if ui:valid(sl.con) then sl.con:Remove() return end
@@ -372,8 +392,8 @@ function SETUP:CreateActionButton(variablePanel, val)
     DBase.CreateUIButton(variablePanel, {
         dock_indent = { RIGHT, nil, 10, 15 - 4, 10 },
         wide = 32,
-        icon = { DanLib.Config.Materials['Info'] },
-        tooltip = {'Read More', nil, nil, TOP },
+        icon = { DMaterials['Info'] },
+        tooltip = { 'Additionally', nil, nil, TOP },
         click = function()
             if (type(val.Action) == 'function') then
                 val.Action()  -- If it is a function, call it
@@ -389,7 +409,7 @@ function SETUP:CreateResetButton(variablePanel, moduleKey, Key)
     DBase.CreateUIButton(variablePanel, {
         dock_indent = { RIGHT, nil, 10, 15 - 4, 10 },
         wide = 32,
-        icon = { DanLib.Config.Materials['Reset'] },
+        icon = { DMaterials['Reset'] },
         tooltip = { DBase:L('#resetting.changes'), nil, nil, TOP },
         click = function()
             self:GetReset(moduleKey, Key)
