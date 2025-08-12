@@ -248,8 +248,6 @@ end
 -- @param module table: The module object
 -- @param sl table: Reference to the current setup object
 function SETUP:CreateVariablePanel(pages, val, moduleKey, module, sl)
-    print(val.Type)
-
     local headerH = 50
     local customElement = val.Type == DanLib.Type.Table and val.VguiElement
     local variablePanel = DCustomUtils(pages)
