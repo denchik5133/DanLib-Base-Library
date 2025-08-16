@@ -77,6 +77,23 @@ function SCROLLBAR:SetUp(_barsize_, _canvassize_)
     self:InvalidateLayout()
 end
 
+function SCROLLBAR:ClearPaint()
+    self.Paint = nil
+    self.btnGrip.Paint = nil
+end
+
+function SCROLLBAR:ApplyPaint()
+    local alpha = 0
+    self.Paint = nil
+    self.btnGrip.Paint = function(sl, w, h)
+        alpha = (sl:IsHovered() or sl.Depressed) and math.Clamp(alpha + 5, 0, 100) or math.Clamp(alpha - 5, 0, 100)
+        draw.RoundedBox(6, 0, 0, w, h, DBase:Theme('scroll_dark'))
+        surface.SetAlphaMultiplier(alpha / 255)
+            draw.RoundedBox(6, 0, 0, w, h, DBase:Theme('decor'))
+        surface.SetAlphaMultiplier(1)
+    end
+end
+
 function SCROLLBAR:OnMouseWheeled(dlta)
     if (not self:IsVisible()) then
         return false
@@ -135,10 +152,10 @@ function SCROLLBAR:AddScroll(dlta)
 end
 
 function SCROLLBAR:SetScroll(scrll)
-    if (not self.Enabled) then
-        self.Scroll = 0
-        return
-    end
+    -- if (not self.Enabled) then
+    --     self.Scroll = 0
+    --     return
+    -- end
 
     self.Scroll = math.Clamp(scrll, 0, self.CanvasSize)
     self:InvalidateLayout()
