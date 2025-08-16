@@ -33,8 +33,10 @@ function SCROLLBAR:Init()
     self.BarSize = 1
 
     self.btnGrip = DCustomUtils(self, 'DScrollBarGrip')
-    self:SetSize(15, 15)
+    self:SetSize(8, 15)
     self:SetHideButtons(false)
+    self.btnGrip:SetCursor('hand')
+    self:SetCursor('hand')
 end
 
 function SCROLLBAR:SetEnabled(b)
@@ -296,20 +298,7 @@ function SCROLL:Init()
     self:SetPaintBackground(false)
 
     local VBar = self:GetVBar()
-    local alpha = 0
-    local cornerRadius = 6
-    VBar:CustomUtils()
-    VBar:ApplyClearPaint()
-    VBar.btnGrip.Paint = function(sl, w, h)
-        alpha = (sl:IsHovered() or sl.Depressed) and math.Clamp(alpha + 5, 0, 100) or math.Clamp(alpha - 5, 0, 100)
-        draw.RoundedBox(cornerRadius, 0, 0, w, h, DBase:Theme('scroll_dark'))
-        surface.SetAlphaMultiplier(alpha / 255)
-            draw.RoundedBox(cornerRadius, 0, 0, w, h, DBase:Theme('decor'))
-        surface.SetAlphaMultiplier(1)
-        self.PaintBackground = true
-    end
-    VBar.btnGrip:SetCursor('hand')
-    VBar:SetCursor('hand')
+    VBar:ApplyPaint()
 
     self:SetWide(self:GetWide() * 0.75)
     VBar:SetWide(VBar:GetWide() * 0.75)
