@@ -149,45 +149,77 @@ local ModuleMeta = {
     -- @param vguiElement: VGUI element (optional).
     -- @param getOptions: Function to get options (optional).
     -- @param action: Action to be performed when the value is changed (optional).
-    AddOption = function(self, variable, name, description, type, default, vguiElement, getOptions, action)
+    AddOption = function(self, variable, name, description, sType, default, vguiElement, getOptions, action)
+        -- Create the option table in Variables
         self.Variables[variable] = {
             Name = name,
             Description = description,
-            Type = type,
+            Type = sType,
             Default = default,
-            VguiElement = vguiElement or (type == DanLib.Type.Table && 'EditablePanel'),
+            VguiElement = vguiElement or (sType == DanLib.Type.Table and 'EditablePanel'),
             GetOptions = getOptions,
-            Default = default,
             Action = action or nil,
-            Order = table.Count(self.Variables) + 1
+            Order = table.Count(self.Variables) + 1,
+            Help = '' -- Initialize help text
         }
 
         -- Validating the default value
-        local handler = DanLib.TypeHandlers[type]
+        local handler = DanLib.TypeHandlers[sType]
         if (handler and not handler.Validate(default)) then
             error('Default value for ' .. variable .. ' is not valid!')
         end
 
-        -- Create an object for chain call
-        local option = { Variable = variable, Module = self }
+        -- Create chainable option configuration object
+        local option = {
+            Parent = self,
+            VariableName = variable,
+            Type = sType
+        }
+        
         -- Method for setting minimum and maximum values
         function option:SetMinMax(minValue, maxValue)
-            if (self.Module.Variables[self.Variable].Type == DanLib.Type.Int) then
-                self.Module.Variables[self.Variable].Min = minValue
-                self.Module.Variables[self.Variable].Max = maxValue
+            if (self.Type ~= DanLib.Type.Int) then
+                print('ERROR: SetMinMax can only be used with Int type options')
+                return self
             end
-            return self.Module
+
+            if (type(minValue) ~= 'number' or type(maxValue) ~= 'number') then
+                print('ERROR: SetMinMax requires numeric min and max values')
+                return self
+            end
+
+            if (minValue > maxValue) then
+                print('ERROR: SetMinMax: minimum value cannot be greater than maximum value')
+                return self
+            end
+            
+            -- Store the values in the parent module's Variables table
+            self.Parent.Variables[self.VariableName].Min = minValue
+            self.Parent.Variables[self.VariableName].Max = maxValue
+            return self -- Return self to allow chaining
         end
 
         -- Method for checking key bindings
         function option:ValidateKeyBinding(bannedKeys)
-            if (self.Module.Variables[self.Variable].Type == DanLib.Type.Key) then
-                self.Module.Variables[self.Variable].bannedKeys = bannedKeys
+            if (self.Parent.Variables[self.Variable].Type == DanLib.Type.Key) then
+                self.Parent.Variables[self.Variable].bannedKeys = bannedKeys
             end
             return self.Module
         end
 
-        return option -- Return option object for chaining call
+        -- Method for setting help text
+        function option:HelpText(helpText)
+            if (type(helpText) ~= 'string') then
+                print('ERROR: HelpText requires a string parameter')
+                return self
+            end
+            
+            -- Store the help text in the parent module's Variables table
+            self.Parent.Variables[self.VariableName].HelpText = helpText
+            return self -- Return self to allow chaining
+        end
+
+        return option -- Return the chainable object
     end,
 
     --- Sets the sort order of the module.
@@ -214,10 +246,14 @@ local ModuleMeta = {
     -- @param variable: The name of the variable.
     GetValue = function(self, variable)
         local varData = self.Variables[variable]
-        if (not varData) then return nil end
+        if (not varData) then
+            return nil
+        end
         
         local handler = DanLib.TypeHandlers[varData.Type]
-        if (not handler) then return varData.Default end
+        if (not handler) then
+            return varData.Default
+        end
 
         local value = DanLib.USERCONFIG[self.ID][variable]
 
@@ -233,7 +269,9 @@ local ModuleMeta = {
     -- Reset a single variable to its default value
     ResetValue = function(self, variable)
         local varData = self.Variables[variable]
-        if (not varData) then return end
+        if (not varData) then
+            return
+        end
 
         DanLib.SaveUserConfig()
     end,
@@ -241,7 +279,9 @@ local ModuleMeta = {
     ResetAll = function(self)
         for variable, data in pairs(self.Variables) do
             local varData = self.Variables[variable]
-            if (not varData) then return end
+            if (not varData) then
+                return
+            end
             
             -- Reset variable value to default value
             DanLib.USERCONFIG[self.ID][variable] = varData.Default
