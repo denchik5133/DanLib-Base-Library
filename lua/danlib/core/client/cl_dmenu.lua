@@ -54,13 +54,41 @@ function CONTEXT:Init()
     self:SetMaxHeight(DUtils:ScaleTall(300))
     self:CustomUtils()
     self:ApplyAttenuation(0.2)
+    -- Create internal DScrollPanel with 4px margins
+    self.ScrollPanel = DCustomUtils(self, 'DanLib.UI.Scroll')
+    self.ScrollPanel:PinMargin(FILL, nil, 4, nil, 4)
     -- Setting the width of the vertical bar
-    self:GetVBar():SetWide(0)
-    self:GetParent():DockMargin(10, 10, 10, 10)
+    self.ScrollPanel:ToggleScrollBar()
 
     RegisterDermaMenuForClose(self)
 end
 
+-- Add compatibility methods to delegate scroll panel functionality
+function CONTEXT:GetVBar()
+    return self.ScrollPanel:GetVBar()
+end
+
+function CONTEXT:GetCanvas()
+    return self.ScrollPanel:GetCanvas()
+end
+
+function CONTEXT:AddItem(item)
+    return self.ScrollPanel:AddItem(item)
+end
+
+-- Mouse wheel handling for margins
+function CONTEXT:OnMouseWheeled(delta)
+    return self.ScrollPanel:OnMouseWheeled(delta)
+end
+
+-- Additional compatibility methods
+function CONTEXT:ScrollToChild(child)
+    return self.ScrollPanel:ScrollToChild(child)
+end
+
+function CONTEXT:ScrollToTop()
+    return self.ScrollPanel:ScrollToTop()
+end
 
 -- Helper function for common layout operations
 -- @param element The element to layout
@@ -82,13 +110,13 @@ end
 -- Adds a panel to the menu
 -- @param pnl (Panel) The panel to be added
 function CONTEXT:AddPanel(pnl)
-    self:AddItem(pnl)
+    self.ScrollPanel:AddItem(pnl)
     pnl.ParentMenu = self
 end
 
 -- Add a divider to the menu
 function CONTEXT:AddDivider()
-    local divider = DCustomUtils(self)
+    local divider = DCustomUtils(self.ScrollPanel)
     divider:SetTall(1)
     divider:ApplyBackground(DBase:Theme('line_up'))
     self:AddPanel(divider)
@@ -105,7 +133,7 @@ function CONTEXT:CreateOption(strText, strColor, strIcon)
     strText = strText or DBase:L('#no.data')
     strColor = strColor or DBase:Theme('title')
 
-    local button = DBase:CreateButton(self, strText, 'danlib_font_18', strColor)
+    local button = DBase:CreateButton(self.ScrollPanel, strText, 'danlib_font_18', strColor)
     button:SetContentAlignment(4)
     button:SetTextInset(strIcon and TEXT_INSET_WITH_ICON or TEXT_INSET_DEFAULT, 0)
     button:PinMargin(TOP)
@@ -191,7 +219,7 @@ function CONTEXT:CreateCheckBox(strText, strColor, bChecked)
     bChecked = bChecked or false
 
     -- Create button like Option, but with checkbox as icon
-    local button = DBase:CreateButton(self, strText, 'danlib_font_18', strColor)
+    local button = DBase:CreateButton(self.ScrollPanel, strText, 'danlib_font_18', strColor)
     button:SetContentAlignment(4)
     button:SetTextInset(TEXT_INSET_WITH_ICON - 6, 0)
     button:PinMargin(TOP)
@@ -385,22 +413,24 @@ function CONTEXT:PerformLayout(w, h)
     local maxHeight = self:GetMaxHeight()
     local totalHeight = 0
 
-    for _, v in ipairs(self:GetCanvas():GetChildren()) do
+    for _, v in ipairs(self.ScrollPanel:GetCanvas():GetChildren()) do
         v:InvalidateLayout(true)
         minWidth = max(minWidth, v:GetWide())
     end
 
     self:SetWide(minWidth)
 
-    for _, v in ipairs(self:GetCanvas():GetChildren()) do
+    for _, v in ipairs(self.ScrollPanel:GetCanvas():GetChildren()) do
         v:SetWide(minWidth)
         v:SetPos(0, totalHeight)
         v:InvalidateLayout(true)
         totalHeight = totalHeight + v:GetTall()
     end
 
-    totalHeight = min(totalHeight, maxHeight)
+    totalHeight = min(totalHeight + 8, maxHeight)
     self:SetTall(totalHeight)
+    -- Ensure scroll panel layout is updated after parent sizing
+    self.ScrollPanel:InvalidateLayout(true)
 end
 
 -- Opens the menu
@@ -440,7 +470,7 @@ function CONTEXT:Open(x, y)
     self:SetKeyboardInputEnabled(true)
 end
 
-CONTEXT:SetBase('DScrollPanel')
+CONTEXT:SetBase('DPanel')
 CONTEXT:Register('DanLib.UI.ContextMenu')
 
 -- Creates a UI context menu
@@ -452,11 +482,6 @@ function DBase:UIContextMenu(parent)
     context:SetParent(parent)
     return context
 end
-
-
-
-
-
 
 
 
