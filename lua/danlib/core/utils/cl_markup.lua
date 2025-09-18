@@ -901,7 +901,7 @@ local function testTextHUD()
 	-- Call the function to display the text with the maximum width value
 	DUtils:DrawParseText(text, nil, ScrW() - 10, 100, nil, TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP, 0)
 end
-DHook:Add('HUDPaint', 'DrawParseText', testTextHUD)
+-- DHook:Add('HUDPaint', 'DrawParseText', testTextHUD)
 
 -- Compatibility exports
 if (DanLib and DanLib.Markup) then
