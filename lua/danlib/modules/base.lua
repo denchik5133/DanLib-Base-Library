@@ -26,6 +26,14 @@ BASE:SetDescription('The main library is designed for the use of add-ons based o
 BASE:SetColor(Color(255, 165, 0))
 BASE:SetSortOrder(1)
 
+BASE:AddOption('Gamemode', 'Gamemode', 'Select the appropriate gamemode.', DanLib.Type.String, 'Blank', false, function()
+    local gamemode = {}
+    for k, v in pairs(DanLib.Func:GetAllGamemodes()) do
+        gamemode[v.ID] = k
+    end
+    return gamemode
+end)
+
 BASE:AddOption('Tag', 'Tag', 'What should our chat tag be? There is no need to put </, !, [ ]>', DanLib.Type.String, 'DanLib')
 BASE:AddOption('ChatCommand', 'Chat Command', 'What should our chat command be?. There is no need to put signs </, !>', DanLib.Type.String, 'danlibmenu')
 BASE:AddOption('CurrencySymbol', 'Currency symbol', 'Put the currency symbol you would like to see on the server.', DanLib.Type.String, '$')
@@ -45,6 +53,7 @@ BASE:AddOption('Languages', 'Languages', 'The language used for the addon.', Dan
     end
     return languages
 end)
+
 BASE:AddOption('Themes', 'Themes', 'The colours used for various UI elements.', DanLib.Type.String, 'default', false, function()
     local themes = {}
     for k, v in pairs(DanLib.Temp.Themes) do

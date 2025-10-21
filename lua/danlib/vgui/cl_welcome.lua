@@ -64,7 +64,7 @@ function DanLib.PopupWelcome()
 
     MainFrame = DanLib.CustomUtils.Create()
     Frame = MainFrame
-    Frame:ApplySize(ScrW(), ScrH())
+    Frame:SetSize(ScrW(), ScrH())
     Frame:MakePopup() 
     Frame:Center()
     Frame:SetAlpha(0)
