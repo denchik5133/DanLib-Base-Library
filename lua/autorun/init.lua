@@ -165,12 +165,10 @@ local function Start()
     BASE:IncludeDir('core/shared') -- Upload all files in the shared directory
     -- Downloading the language files
     DanLib.Func.LoadLanguages()
-    -- Uploading themes
-    -- BASE:IncludeDir('themes') -- Upload all files in the theme directory
     -- Downloading themes for the interface
     DanLib.Func.LoadThemes()
-    -- Uploading commands
-    -- BASE:IncludeDir('commands') -- Upload all files in the command directory
+    -- Uploading gamemodes
+    DanLib.Func.LoadGamemodes()
     -- Uploading chat commands
     DanLib.Func.LoadCommands()
     -- Uploading client files
