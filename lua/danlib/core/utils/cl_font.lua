@@ -28,7 +28,7 @@ function base:GetSize(number)
     return number * Ratio * (DDI.Scale or 1)
 end
 
-function base:CreateFont(name, size, font, mergeTbl)
+function base:CreateFont(name, size, font, weight, mergeTbl)
     local tbl = {
         font = font or 'Montserrat Regular', -- Montserrat Medium
         size = size or self:GetSize(18),
