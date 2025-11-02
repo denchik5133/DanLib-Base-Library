@@ -129,7 +129,7 @@ function SETUP:GetSortedConfig()
     return sortedConfig
 end
 
-
+-- The default reset depends on the type.
 function SETUP:GetReset(moduleKey, key)
     -- Retrieve module by key
     local module = DanLib.ConfigMeta[moduleKey]
@@ -153,6 +153,9 @@ function SETUP:GetReset(moduleKey, key)
     elseif (type(defaultValues) == 'boolean') then
         -- If it's a boolean, leave it unchanged
         defaultValues = defaultValues
+    elseif (type(defaultValues) == 'number') then
+        -- If it's a number, leave it unchanged
+        defaultValues = defaultValues
     else
         -- If it is not a table, string, or boolean, we print an error message
         DBase:PrintError('A table, string, or boolean was expected but received: ' .. type(defaultValues))
@@ -162,7 +165,6 @@ function SETUP:GetReset(moduleKey, key)
     -- Call the function to change the configuration
     DBase:SetConfigVariable(moduleKey, key, defaultValues)
 end
-
 
 --- Fills the pages with content
 function SETUP:PopulatePages()
