@@ -33,11 +33,16 @@
 
 
 
-local base = DanLib.Func
-local utils = DanLib.Utils
-local Table = DanLib.Table
-local network = DanLib.Network
-local customUtils = DanLib.CustomUtils
+local DBase = DanLib.Func
+local DUtils = DanLib.Utils
+local DTheme = DanLib.Config.Theme
+local DCustomUtils = DanLib.CustomUtils.Create
+
+local _Clamp = math.Clamp
+local _utf8len = utf8.len
+local _utf8sub = utf8.sub
+local _ColorAlpha = ColorAlpha
+local _SimpleText = draw.SimpleText
  
 
 --- Creates a text field in the specified panel.
@@ -45,18 +50,18 @@ local customUtils = DanLib.CustomUtils
 -- @param strIcon: An icon displayed to the left of the text box. Default is nil.
 -- @param iSize: Icon Size. Defaults to 16 unless specified.
 -- @return TextEntry: Returns the created text field for a chain of method calls.
-function DanLib.Func.CreateTextEntry(parent, strIcon, iSize)
-    local tTextEntry = DanLib.CustomUtils.Create(parent)
+function DBase.CreateTextEntry(parent, strIcon, iSize)
+    local tTextEntry = DCustomUtils(parent)
 
     -- Creating an icon, if specified
     if strIcon then
-        tTextEntry.icon = DanLib.CustomUtils.Create(tTextEntry)
+        tTextEntry.icon = DCustomUtils(tTextEntry)
         tTextEntry.icon:SetMouseInputEnabled(false)
         tTextEntry.icon.size = iSize or 16
 
         -- Drawing an icon
         tTextEntry.icon:ApplyEvent(nil, function(sl, w, h)
-            DanLib.Utils:DrawIconOrMaterial(w * 0.5 - sl.size * 0.5, h * 0.5 - sl.size * 0.5, sl.size, strIcon, DanLib.Func:Theme('mat', 150))
+            DUtils:DrawIconOrMaterial(w * 0.5 - sl.size * 0.5, h * 0.5 - sl.size * 0.5, sl.size, strIcon, DBase:Theme('mat', 150))
         end)
 
         -- Setting the dimensions for the icon
@@ -67,14 +72,13 @@ function DanLib.Func.CreateTextEntry(parent, strIcon, iSize)
     end
 
     -- Creating a text field
-    tTextEntry.textEntry = DanLib.CustomUtils.Create(tTextEntry, 'DTextEntry')
-    tTextEntry.textEntry:Dock(FILL)
-    tTextEntry.textEntry:DockMargin(strIcon and 30 or 8, 0, 8, 0)
+    tTextEntry.textEntry = DCustomUtils(tTextEntry, 'DTextEntry')
+    tTextEntry.textEntry:PinMargin(nil, strIcon and 30 or 8, nil, 8)
     tTextEntry.textEntry:SetFont('danlib_font_18')
     tTextEntry.textEntry:SetText('')
     tTextEntry.textEntry:SetTextColor(Color(255, 255, 255, 20))
     tTextEntry.textEntry:SetCursorColor(Color(255, 255, 255))
-    tTextEntry.textEntry.backTextColor = DanLib.Func:Theme('text', 100)
+    tTextEntry.textEntry.backTextColor = DBase:Theme('text', 100)
 
     -- Handler for clicking on the parent element
     -- TODO:
@@ -92,21 +96,26 @@ function DanLib.Func.CreateTextEntry(parent, strIcon, iSize)
     tTextEntry.textEntry:ApplyEvent(nil, function(sl, w, h)
         local textColor = sl:GetTextColor()
         if (textColor.a != 255 or textColor.a != 0) then
-            sl:SetTextColor(DanLib.Func:Theme('text', 100 + (tTextEntry.alpha or 0)))
+            sl:SetTextColor(DBase:Theme('text', 100 + (tTextEntry.alpha or 0)))
         end
 
         sl:DrawTextEntryText(textColor, sl:GetHighlightColor(), sl:GetCursorColor())
     
         if (not sl:IsEditing() and sl:GetText() == '') then
-            draw.SimpleText(sl.backText or '', sl:GetFont(), 0, h / 2, sl.backTextColor, 0, TEXT_ALIGN_CENTER)
+            _SimpleText(sl.backText or '', sl:GetFont(), 0, h / 2, sl.backTextColor, 0, TEXT_ALIGN_CENTER)
         end
     end)
 
     -- Setting event handlers
     local function setEventHandler(eventName, handler)
         tTextEntry.textEntry[eventName] = function(...)
-            if tTextEntry[eventName] then tTextEntry[eventName](...) end
-            if handler then handler(...) end
+            if tTextEntry[eventName] then
+                tTextEntry[eventName](...)
+            end
+
+            if handler then
+                handler(...)
+            end
         end
     end
 
@@ -186,45 +195,48 @@ function DanLib.Func.CreateTextEntry(parent, strIcon, iSize)
     -- @return TextEntry: Returns an instance of the text field for a chain of method calls.
     function tTextEntry:SetVerification(verification) self.verification = verification return self end
 
-    -- Character Limitation
-    local TextValue, CharCount = '', 0
-    tTextEntry.SymbolsLimit = function(self, max)
-        self.max = max
-        self.textEntry.ODTextVal = ''
-        self.textEntry.OnValueChange = function()
-            TextValue = self:GetValue()
-            local Number = string.len(TextValue)
-
-            if (Number > max) then
-                self:SetText(self.ODTextVal)
-                self:SetValue(self.ODTextVal)
-            else
-                self.ODTextVal = TextValue
-            end
-        end
-    end
-
     -- Turning off shadows
-    tTextEntry.DisableShadows = function(self, distance, noClip, iteration)
+    tTextEntry:ApplyEvent('DisableShadows', function(self, distance, noClip, iteration)
         self:ApplyShadow(distance or 10, noClip or false, iteration or 5)
         return self
-    end
+    end)
+
+    --- Character Limitation
+    tTextEntry:ApplyEvent('SetMaxChar', function(self, max)
+        self.max = max
+        
+        -- Redefining AllowInput to prevent unnecessary characters from being entered
+        self.textEntry.AllowInput = function(sl, char)
+            local text = sl:GetValue()
+            local currentLen = _utf8len(text) or 0
+            
+            -- We allow input only if the limit is not exceeded
+            -- or if the character is a control key (backspace, etc.)
+            if (currentLen >= max and char ~= nil and char ~= '') then
+                return true -- Blocking the input
+            end
+            
+            return false -- Allowing input
+        end
+    end)
 
     -- Drawing a text box
     tTextEntry:ApplyEvent(nil, function(self, w, h)
-    	local is_editing = self.textEntry:IsEditing()
+        local is_editing = self.textEntry:IsEditing()
         self:ApplyAlpha(0.1, 155, false, false, is_editing, 155)
-        self.hoverPercent = is_editing and math.Clamp((self.hoverPercent or 0) + 5, 0, 100) or math.Clamp((self.hoverPercent or 0) - 5, 0, 100)
+        self.hoverPercent = is_editing and _Clamp((self.hoverPercent or 0) + 5, 0, 100) or _Clamp((self.hoverPercent or 0) - 5, 0, 100)
         local hoverPercent = self.hoverPercent / 100
 
-        utils:DrawRect(0, 0, w, h, base:Theme('decor_elements'))
-        utils:OutlinedRect(0, 0, w, h, base:Theme('frame'))
-        utils:OutlinedRect(0, 0, w, h, self.verification and ColorAlpha(DanLib.Config.Theme['Red'], hoverPercent * 100) or base:Theme('decor', hoverPercent * 100))
+        DUtils:DrawRect(0, 0, w, h, DBase:Theme('decor_elements'))
+        DUtils:OutlinedRect(0, 0, w, h, DBase:Theme('frame'))
+        DUtils:OutlinedRect(0, 0, w, h, self.verification and _ColorAlpha(DTheme['Red'], hoverPercent * 100) or DBase:Theme('decor', hoverPercent * 100))
 
         -- Character count
-    	local CharCount = self.max and (self.max - (Number or 0)) or 0
         if self.max then
-            draw.SimpleText(CharCount, 'danlib_font_18', w - 4, 10, base:Theme('text'), TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+            local currentLen = _utf8len(self:GetValue()) or 0
+            local remaining = self.max - currentLen
+            local countColor = (remaining <= 0) and _ColorAlpha(DTheme['Red'], 150) or DBase:Theme('text', 150)
+            _SimpleText(remaining, 'danlib_font_16', w - 4, 10, countColor, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
         end
     end)
 
