@@ -70,7 +70,7 @@ function base:QueriesPopup(title, text, confirmText, confirmFunc, cancelText, ca
     -- Calculate text size and set pop-up dimensions
     local text_h = utils:TextSize(Container.Text, defaultFont).h
     Container:SetPopupWide(450)
-    Container:SetExtraHeight(70 + text_h)
+    Container:SetExtraHeight(80 + text_h)
 
     -- Create text area
     local textArea = CustomUtils.Create(Container)
