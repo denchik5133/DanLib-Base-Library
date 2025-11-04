@@ -31,8 +31,9 @@
  
 
 
-local base = DanLib.Func
+local DBase = DanLib.Func
 local utils = DanLib.Utils
+local DCustomUtils = DanLib.CustomUtils.Create
 local form = string.format
 
 --- Creates a button in the specified parent panel.
@@ -40,19 +41,18 @@ local form = string.format
 -- @param text: The text to be displayed on the button. Defaults to an empty string if not provided.
 -- @param font: The font to be used for the button text. Defaults to 'danlib_font_20' if not provided.
 -- @param textColor: The color of the button text. Defaults to the theme's text color if not provided.
-function base:CreateButton(parent, text, font, textColor)
-    local button = DanLib.CustomUtils.Create(parent, 'DButton')
+function DBase:CreateButton(parent, text, font, textColor)
+    local button = DCustomUtils(parent, 'DButton')
     button:SetText(text or '')
-    button:SetTextColor(textColor or base:Theme('text'))
+    button:SetTextColor(textColor or DBase:Theme('text'))
     button:SetFont(font or 'danlib_font_20')
 
 
     -- Initialize default properties for the button
-    button.BackgroundColor = base:Theme('button')
-    button.HoverColor = base:Theme('button_hovered')
+    button.BackgroundColor = DBase:Theme('button')
+    button.HoverColor = DBase:Theme('button_hovered')
     button.sIconSize = 24
     button.hover = 0
-
 
     --- Sets the background color of the button.
     -- @param color: The color to set as the background.
@@ -62,7 +62,6 @@ function base:CreateButton(parent, text, font, textColor)
         return self
     end
 
-
     --- Sets the hover color of the button.
     -- @param color: The color to set when the button is hovered.
     -- @return Button: Returns the button instance for method chaining.
@@ -71,7 +70,6 @@ function base:CreateButton(parent, text, font, textColor)
         return self
     end
 
-
     --- Sets the hover toggle state of the button.
     -- @param tum: Boolean indicating whether hover effects should be applied.
     -- @return Button: Returns the button instance for method chaining.
@@ -79,7 +77,6 @@ function base:CreateButton(parent, text, font, textColor)
         self.HoverTum = tum
         return self
     end
-
 
     --- Sets the icon of the button.
     -- @param icon: The icon to be displayed on the button.
@@ -93,13 +90,12 @@ function base:CreateButton(parent, text, font, textColor)
         return self
     end
 
-
     --- Paint function for the button.
     -- This function is responsible for rendering the button's appearance.
     -- @param w: The width of the button.
     -- @param h: The height of the button.
     function button:Paint(w, h)
-        local IconSize = base:Scale(self.sIconSize)
+        local IconSize = DBase:Scale(self.sIconSize)
 
         -- Hover effect
         if self:IsHovered() then
@@ -121,7 +117,7 @@ function base:CreateButton(parent, text, font, textColor)
         end
 
         if self.sIcon then
-            local iconColor = self.IconColor or base:Theme('mat', 100 + hover * 250)
+            local iconColor = self.IconColor or DBase:Theme('mat', 100 + hover * 250)
             local iconPosX = w * 0.5 - IconSize * 0.5
             local iconPosY = h * 0.5 - IconSize * 0.5
             utils:DrawIconOrMaterial(iconPosX, iconPosY, IconSize, self.sIcon, iconColor)
@@ -132,14 +128,6 @@ function base:CreateButton(parent, text, font, textColor)
 
     return button
 end
-
-
-
-
-
-
-
-
 
 
 --- Creates a button in the specified parent panel with customizable options.
@@ -168,118 +156,169 @@ end
 -- @note: The `think` function can be used to implement custom behavior that needs to be updated 
 -- every frame (e.g., animations, state changes). To use it, provide a function in the options 
 -- table under the `think` key. The function will receive the button instance as its first argument.
-function base.CreateUIButton(parent, options)
+function DBase.CreateUIButton(parent, options)
     parent = parent or nil
-    options = options or {} -- Ensure options is not nil
-
-    local button = DanLib.CustomUtils.Create(parent, 'DButton')
+    options = options or {}
+    local button = DCustomUtils(parent, 'DButton')
     button:SetText('')
     button:ApplyClearPaint()
 
-    -- Background settings
-    local backgroundColor
-    if options.background then
-        if options.background[1] then
-            backgroundColor = IsColor(options.background[1]) and options.background[1] or base:Theme('button')
-        else
-            backgroundColor = Color(0, 0, 0, 0) -- If background is {nil}, set backgroundColor to nil
-            button:ApplyClearPaint()
+    -- Helper to check if key exists in options table
+    local function hasKey(key)
+        for k in pairs(options) do
+            if (k == key) then
+                return true
+            end
         end
-    else
-        backgroundColor = base:Theme('button') -- Default color if background is not provided
+        return false
     end
 
-    local cornerRadius = options.background and options.background[2]
-    local rounding = options.background and options.background[3]
-    button:ApplyBackground(backgroundColor, cornerRadius, rounding)
+    -- Helper function to normalize options (supports both nil and {nil} formats)
+    local function normalizeOption(opt)
+        if (opt == nil) then
+            return {nil}
+        elseif (type(opt) == 'table') then
+            return opt
+        else
+            return { opt }
+        end
+    end
 
+    -- Background settings
+    if hasKey('background') then
+        local background = normalizeOption(options.background)
+        local backgroundColor
+        
+        if background[1] then
+            backgroundColor = IsColor(background[1]) and background[1] or DBase:Theme('button')
+        else
+            backgroundColor = Color(0, 0, 0, 0)
+        end
+        
+        local cornerRadius = background[2] or 6
+        local rounding = background[3]
+        button:ApplyBackground(backgroundColor, cornerRadius, rounding)
+    else
+        -- Key not present - use default
+        button:ApplyBackground(DBase:Theme('button'), 6, nil)
+    end
 
     -- Hover settings
-    local hoverColor
-    if options.hover then
-        if options.hover[1] then
-            hoverColor = IsColor(options.hover[1]) and options.hover[1] or base:Theme('button_hovered')
+    if hasKey('hover') then
+        local hover = normalizeOption(options.hover)
+        local hoverColor
+        
+        if hover[1] then
+            hoverColor = IsColor(hover[1]) and hover[1] or DBase:Theme('button_hovered')
         else
-            hoverColor = Color(0, 0, 0, 0) -- If hover is {nil}, set hoverColor to nil
+            hoverColor = Color(0, 0, 0, 0)
+        end
+        
+        local hoverSpeed = hover[2]
+        local hoverRad = hover[3] or 6
+        
+        if hoverColor.a > 0 then
+            button:ApplyFadeHover(hoverColor, hoverSpeed, hoverRad)
+            
+            local originalThink = button.Think
+            button.Think = function(sl)
+                if originalThink then
+                    originalThink(sl)
+                end
+                if sl:GetDisabled() then
+                    sl.HoverFade = 0
+                end
+            end
         end
     else
-        hoverColor = base:Theme('button_hovered') -- Default color if hover is not provided
+        -- Key not present - use default
+        local hoverColor = DBase:Theme('button_hovered')
+        button:ApplyFadeHover(hoverColor, nil, 6)
+        
+        local originalThink = button.Think
+        button.Think = function(sl)
+            if originalThink then
+                originalThink(sl)
+            end
+            if sl:GetDisabled() then
+                sl.HoverFade = 0
+            end
+        end
     end
 
-    local hoverSpeed = (options.hover and options.hover[2]) or nil
-    local hoverRad = (options.hover and options.hover[3]) or nil
-    button:ApplyFadeHover(hoverColor, hoverSpeed, hoverRad)
-
     -- Text
-    if options.text then
-        local text = (options.text and options.text[1]) or nil
-        local textFont = (options.text[2] and options.text[2]) or nil
-        local textX = (options.text[3] and options.text[3]) or nil
-        local textH = (options.text[4] and options.text[4]) or nil
-        local textColor = (options.text and IsColor(options.text[5])) and options.text[5] or base:Theme('text')
-        local textXalign = (options.text[6] and options.text[6]) or nil
-        local textYalign = (options.text[7] and options.text[7]) or nil
-        button:ApplyText(text, textFont, textX, textH, textColor, textXalign, textYalign)
+    if hasKey('text') then
+        local text = normalizeOption(options.text)
+        local textStr = text[1]
+        local textFont = text[2]
+        local textX = text[3]
+        local textY = text[4]
+        local textColor = (IsColor(text[5])) and text[5] or DBase:Theme('text')
+        local textXalign = text[6]
+        local textYalign = text[7]
+        button:ApplyText(textStr, textFont, textX, textY, textColor, textXalign, textYalign)
     end
 
     -- Docking options
-    if options.dock then
-        local dock = options.dock[1] -- Position (e.g. 'TOP', 'LEFT', etc...)
-        local indent = options.dock[2] or 0 -- Indentation, defaults to 0 if not specified
-        button:Pin(dock, indent)
+    if hasKey('dock') then
+        local dock = normalizeOption(options.dock)
+        if dock[1] then
+            local dockPos = dock[1]
+            local indent = dock[2] or 0
+            button:Pin(dockPos, indent)
+        end
     end
 
-    if options.dock_indent then
-        local dock = options.dock_indent[1] -- Position (e.g. 'TOP', 'LEFT', etc...)
-        local indent1 = options.dock_indent[2] or 0 -- Indent (Left), default 0 if not specified
-        local indent2 = options.dock_indent[3] or 0 -- Indent (Top), defaults to 0 if not specified
-        local indent3 = options.dock_indent[4] or 0 -- Indent (Right), default 0 if not specified
-        local indent4 = options.dock_indent[5] or 0 -- Indent (Bottom), default 0 if not specified
-        button:Dock(dock)
+    if hasKey('dock_indent') then
+        local dockIndent = normalizeOption(options.dock_indent)
+        local dockPos = dockIndent[1]
+        local indent1 = dockIndent[2] or 0
+        local indent2 = dockIndent[3] or 0
+        local indent3 = dockIndent[4] or 0
+        local indent4 = dockIndent[5] or 0
+        button:Dock(dockPos)
         button:DockMargin(indent1, indent2, indent3, indent4)
     end
 
     -- Position setting
-    if options.pos then
+    if hasKey('pos') then
         button:SetPos(unpack(options.pos))
     end
 
     -- Setting the button size
-    if options.size then
+    if hasKey('size') then
         button:SetSize(unpack(options.size))
     end
 
-    if options.wide then
+    if hasKey('wide') then
         button:SetWide(options.wide)
     end
 
-    if options.tall then
+    if hasKey('tall') then
         button:SetTall(options.tall)
     end
 
     -- Click processing
-    if options.click then
+    if hasKey('click') then
         button:ApplyEvent('DoClick', options.click or function() end)
     end
 
-    if options.rclick then
+    if hasKey('rclick') then
         button:ApplyEvent('DoRightClick', options.rclick or function() end)
     end
 
-    -- button:ApplySound('ddi/button-hover.wav', 'ddi/button-click.wav')
-
     -- Tooltip settings
-    if options.tooltip then
-        local text = options.tooltip[1] -- Text (For example: 'Hello!')
-        local color = options.tooltip[2] -- color (For example: Color(255, 255, 255))
+    if hasKey('tooltip') then
+        local tooltip = normalizeOption(options.tooltip)
+        local text = tooltip[1]
+        local color = tooltip[2]
         local tooltipColor = (color and IsColor(color)) and color or nil
-        local icon = options.tooltip[3] -- Icon (For example: '5eUOM3U' or Material('path/to/icon.png'))
-        local indent = options.tooltip[4] -- Position (For example: 'TOP', 'LEFT', etc...)
+        local icon = tooltip[3]
+        local indent = tooltip[4]
         button:ApplyTooltip(text, tooltipColor, icon, indent)
     end
 
-
-    if options.think then
+    if hasKey('think') then
         button:ApplyEvent('Think', function(self, w, h)
             return options.think(self, w, h)
         end)
@@ -287,41 +326,49 @@ function base.CreateUIButton(parent, options)
 
     -- Button drawing function
     button:ApplyEvent(nil, function(self, w, h)
-        -- If a custom Paint function is provided, use it
-        if options.paint then
+        if hasKey('paint') then
             return options.paint(self, w, h)
         end
-
-        -- Icon settings
-        if options.icon then
-            local icon = options.icon[1] or ''
-            local iconColor = (options.icon and IsColor(options.icon[2])) and options.icon[2] or base:Theme('mat', 150)
-            local iconSize = (options.icon and options.icon[3]) or 18
-            -- If the custom function is not provided, use the standard implementation
-            local IconSize = base:Scale(iconSize)
+        
+        if hasKey('icon') then
+            local icon = normalizeOption(options.icon)
+            local iconStr = icon[1] or ''
+            local iconColor = (IsColor(icon[2])) and icon[2] or DBase:Theme('mat', 150)
+            local iconSize = icon[3] or 18
+            local IconSize = DBase:Scale(iconSize)
             local iconPosX = w * 0.5 - IconSize * 0.5
             local iconPosY = h * 0.5 - IconSize * 0.5
-            utils:DrawIconOrMaterial(iconPosX, iconPosY, IconSize, icon, iconColor)
+            utils:DrawIconOrMaterial(iconPosX, iconPosY, IconSize, iconStr, iconColor)
         end
-
+        
         return self
     end)
 
     -- Hover click effects
-    local hoverClickColor
-    if options.hoverClick then
-        if options.hoverClick[1] then
-            hoverClickColor = IsColor(options.hoverClick[1]) and options.hoverClick[1] or nil
+    if hasKey('hoverClick') then
+        local hoverClick = normalizeOption(options.hoverClick)
+        local hoverClickColor
+        
+        if hoverClick[1] then
+            hoverClickColor = IsColor(hoverClick[1]) and hoverClick[1] or nil
         else
-            hoverClickColor = Color(0, 0, 0, 0) -- If hoverClick is {nil}, set hoverClickColor to nil
+            hoverClickColor = Color(0, 0, 0, 0)
         end
-    else
-        hoverClickColor = nil
-    end
 
-    local hoverClickSpeed = options.hoverClick and options.hoverClick[2]
-    local hoverClickRadius = options.hoverClick and options.hoverClick[3]
-    button:ApplyCircleEffect(hoverClickColor, hoverClickSpeed, hoverClickRadius)
+        local hoverClickSpeed = hoverClick[2]
+        local hoverClickRadius = hoverClick[3]
+        
+        if (hoverClickColor and hoverClickColor.a > 0) then
+            button:ApplyCircleEffect(hoverClickColor, hoverClickSpeed, hoverClickRadius)
+            
+            local originalOnMousePressed = button.OnMousePressed
+            button.OnMousePressed = function(sl, keyCode)
+                if (not sl:GetDisabled() and originalOnMousePressed) then
+                    originalOnMousePressed(sl, keyCode)
+                end
+            end
+        end
+    end
 
     return button
 end
