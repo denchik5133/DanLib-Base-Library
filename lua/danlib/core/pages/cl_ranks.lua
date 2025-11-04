@@ -37,13 +37,11 @@ function RANK:CheckAccess()
     return true
 end
 
-
 --- Gets the current rank value.
 -- @return table: rank values.
 function RANK:GetRanksValues()
     return DBase:RetrieveUpdatedVariable('BASE', 'Ranks') or DanLib.ConfigMeta.BASE:GetValue('Ranks')
 end
-
 
 --- Adds a new rank.
 function RANK:add_new()
@@ -93,7 +91,6 @@ function RANK:add_new()
     end)
 end
 
-
 --- Checks if the player can edit the specified rank.
 -- @param actor Player: The player who is trying to edit the rank.
 -- @param targetRankKey string: The key of the rank the player is trying to edit.
@@ -112,7 +109,6 @@ function RANK:CanEditRank(targetRankKey)
 
     return false
 end
-
 
 --- Fills the panel with the required interface components.
 function RANK:FillPanel()
@@ -148,7 +144,6 @@ function RANK:FillPanel()
     self:Refresh() -- Interface update
 end
 
-
 --- Updates the interface with the current rank values.
 function RANK:Refresh()
     self.grid:Clear()
@@ -159,7 +154,7 @@ function RANK:Refresh()
     for k, v in pairs(values) do
         DTable:Add(sorted, { v.Order, k })
     end
-    DTable:SortByMember(sorted, 1, true)
+    DTable:SortByMember(sorted, 1, false)
 
     local panelH = 60
     for k, v in ipairs(sorted) do
@@ -173,7 +168,6 @@ function RANK:Refresh()
 
     self:CreateAddRankButton()
 end
-
 
 --- Creates a panel for a specific rank.
 -- @param rolePanel Panel: The panel on which the rank will be displayed.
@@ -227,7 +221,6 @@ function RANK:CreateRankPanel(rolePanel, values, Key, sorted, panelH, k)
     self:CreateRankActionButton(Panel, Key, values, RankColor, name)
 end
 
-
 --- Draws an effect on the move button.
 -- @param sl Panel: The panel of the button.
 -- @param h number: Height of the button.
@@ -247,7 +240,6 @@ function RANK:DrawMoveButtonEffect(sl, h, icon, direction)
     local iconSize = 14 * clickPercent
     DUtils:DrawIcon(sl:GetWide() / 2 - iconSize / 2, h / 2 - iconSize / 2, iconSize, iconSize, icon, Color(238, 238, 238, 50))
 end
-
 
 --- Moves the rank up or down.
 -- @param sl Panel: The panel of the button.
@@ -289,7 +281,6 @@ function RANK:MoveRank(sl, direction, k, sorted, values, Key)
         self:Refresh()
     end
 end
-
 
 --- Creates a button for rank actions.
 -- @param Panel Panel: Panel for the button.
@@ -346,7 +337,6 @@ function RANK:CreateRankActionButton(Panel, Key, values, RankColor, name)
     })
 end
 
-
 --- Edits the rank name.
 -- @param Key string: The key of the rank.
 -- @param values table: Current rank values.
@@ -371,7 +361,6 @@ function RANK:EditRankName(Key, values, name)
     end)
 end
 
-
 --- Deletes the rank.
 -- @param Key string: Rank key.
 -- @param values table: Current rank values.
@@ -388,7 +377,6 @@ function RANK:DeleteRank(Key, values)
     end)
 end
 
-
 --- Changes the colour of the rank.
 -- @param Key string: Rank key.
 -- @param values table: Current rank values.
@@ -401,7 +389,6 @@ function RANK:ChangeRankColor(Key, values)
     end)
 end
 
-
 --- Creates a button to add a new rank.
 function RANK:CreateAddRankButton()
     local createNew = DBase.CreateUIButton(nil, {
@@ -413,7 +400,6 @@ function RANK:CreateAddRankButton()
 
     self.grid:AddCell(createNew, nil, false)
 end
-
 
 --- Opens a window for editing rank permissions.
 -- @param Key string: Rank key.
@@ -478,7 +464,6 @@ function RANK:editPopup(Key, values)
     end
 end
 
-
 function RANK:UsersList()
     local userPanel = DCustomUtils(self.tabs)
     self.tabs:AddTab(userPanel, 'Users')
@@ -499,7 +484,6 @@ function RANK:UsersList()
     DNetwork:Start('DanLib.RequestRankData')
     DNetwork:SendToServer()
 end
-
 
 function RANK:UpdateUserList(scroll, allRankData)
     -- Clearing previous items in the list
@@ -533,7 +517,7 @@ function RANK:UpdateUserList(scroll, allRankData)
 
         local avatar = DCustomUtils(user)
         avatar:ApplyAvatar()
-        avatar:SetSteamID(steamID64, 124)
+        avatar:SetSteamID(steamID64, 64)
         avatar:SetSize(avatarBackSize, avatarBackSize)
         avatar:SetPos(12, user:GetTall() / 2 - avatarBackSize / 2)
 
