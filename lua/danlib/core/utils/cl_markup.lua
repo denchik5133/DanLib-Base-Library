@@ -18,6 +18,10 @@
 
 
 
+local DBase = DanLib.Func
+local DUtils = DanLib.Utils
+local DHook = DanLib.Hook
+
 -- Performance optimizations: Cache frequently used functions and constants
 local markupIndex = {}
 markupIndex.__index = markupIndex
@@ -462,7 +466,6 @@ function markupIndex:Draw(xOffset, yOffset, halign, valign, alphaoverride, textA
     end
 end
 
-
 --- Parses the pseudo-html markup language and creates markup that can be used to display text on the screen.
 -- Supports color, font, and background color tags with high-performance optimizations.
 -- 
@@ -751,13 +754,10 @@ function markupIndex:ParseMarkup(text, dFont, dColor, maxwidth)
 end
 
 -- Ultra-fast markup creation function
-local function CreateMarkup(text, font, color, maxwidth)
+function DUtils:CreateMarkup(text, font, color, maxwidth)
     local markup = _setmetatable({}, markupIndex)
     return markup:ParseMarkup(text, font, color, maxwidth)
 end
-
-local DUtils = DanLib.Utils
-local DHook = DanLib.Hook
 
 --- Draws markup text on the screen at the specified position with the given formatting options.
 -- @param text (string): The markup text to be displayed, which may include formatting tags.
@@ -776,7 +776,7 @@ function DUtils:DrawParseText(text, font, x, y, color, xAlign, yAlign, maxwidth,
 	yAlign = yAlign or TEXT_ALIGN_CENTER
 	textAlign = textAlign or TEXT_ALIGN_CENTER
 
-    local markupObject = CreateMarkup(text, font, color, maxwidth)
+    local markupObject = self:CreateMarkup(text, font, color, maxwidth)
     if markupObject then
         markupObject:Draw(x, y, xAlign, yAlign, nil, textAlign)
     end
@@ -902,10 +902,3 @@ local function testTextHUD()
 	DUtils:DrawParseText(text, nil, ScrW() - 10, 100, nil, TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP, 0)
 end
 -- DHook:Add('HUDPaint', 'DrawParseText', testTextHUD)
-
--- Compatibility exports
-if (DanLib and DanLib.Markup) then
-    DUtils.Create = CreateMarkup
-    DUtils.Escape = escape_text
-    DUtils.Unescape = unescape_text
-end
