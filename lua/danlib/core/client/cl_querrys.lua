@@ -17,14 +17,19 @@
  
 
 
-local base = DanLib.Func
-local utils = DanLib.Utils
-local CustomUtils = DanLib.CustomUtils
+local DBase = DanLib.Func
+local DUtils = DanLib.Utils
+local DCustomUtils = DanLib.CustomUtils.Create
 
 local vgui = vgui
 local string = string
 local upper = string.upper
 local lerp = Lerp
+local _Explode = string.Explode
+local _sub = string.gsub
+local _select = select
+local _max = math.max
+local _ColorAlpha = ColorAlpha
 
 local defaultFont = 'danlib_font_20'
 local cancelColor = Color(236, 57, 62)
@@ -32,188 +37,244 @@ local confirmColor = Color(106, 178, 242)
 
 if IsValid(DANLIB_POPUPS) then DANLIB_POPUPS:Remove() end
 
+--- Calculate text dimensions using DanLib's markup parser
+-- Uses DUtils.Create (CreateMarkup) internally - same as DrawParseText
+-- @param text (string): Text with optional color tags
+-- @param font (string): Font to use for measurement
+-- @param maxWidth (number): Maximum width for text wrapping
+-- @return table: {width, height}
+local function CalculateTextDimensions(text, font, maxWidth)
+    font = font or defaultFont
+    maxWidth = maxWidth or 400
+    
+    -- We use DUtils:CreateMarkup (as in DrawParseText)
+    local tempMarkup = DUtils:CreateMarkup(text, font, DBase:Theme('text'), maxWidth)
+    return {
+        width = tempMarkup:GetWidth(),
+        height = tempMarkup:GetHeight()
+    }
+end
 
 --- Displays a message pop-up with optional confirmation and cancellation buttons.
--- @param title (string): The title of the pop-up.
--- @param text (string): The description or message to display.
--- @param confirmText (string): The text for the confirmation button (default: "Confirm").
--- @param confirmFunc (function): The function to call when the confirmation button is clicked.
--- @param cancelText (string): The text for the cancel button (default: "Cancel").
--- @param cancelFunc (function): The function to call when the cancel button is clicked.
--- @param st (boolean): If true, the cancel button will not be displayed (default: false).
+-- Automatically calculates height based on text content with color tag support.
+-- @param title (string): The title of the pop-up
+-- @param text (string): The description or message to display (supports color tags)
+-- @param confirmText (string): The text for the confirmation button (default: "Confirm")
+-- @param confirmFunc (function): The function to call when the confirmation button is clicked
+-- @param cancelText (string): The text for the cancel button (default: "Cancel")
+-- @param cancelFunc (function): The function to call when the cancel button is clicked
+-- @param st (boolean): If true, the cancel button will not be displayed (default: false)
 --
 -- Example Usage:
---    DanLib.Func:QueriesPopup('Message Title (Optional)', 'Hey Some Text Here!!!', 'Okey', function()
---        DanLib.Func:QueriesPopup('Your headline', 'And a description of anything')
---    end, 'Cancel', function() 
---        DanLib.Func:QueriesPopup('Cancel', 'You pressed Cancel!') 
---    end)
-function base:QueriesPopup(title, text, confirmText, confirmFunc, cancelText, cancelFunc, st)
-    -- Set default values using Lua's or operator
-    confirmText = confirmText or base:L('confirm')
-    cancelText = cancelText or base:L('cancel')
+--    DBase:QueriesPopup(
+--        'DELETE CATEGORY',
+--        'Are you sure you want to delete "{color:red}Prop Abuse{/color:}"?\n\n' ..
+--        '{color:orange}Warning:{/color:} This cannot be undone!',
+--        nil,
+--        function() print('Confirmed!') end
+--    )
+function DBase:QueriesPopup(title, text, confirmText, confirmFunc, cancelText, cancelFunc, st)
+    -- Set default values
+    confirmText = confirmText or DBase:L('confirm')
+    cancelText = cancelText or DBase:L('cancel')
     title = title or 'No text'
     text = text or 'No text'
     st = st or false
 
     -- Create the pop-up container
-    local Container = CustomUtils.Create(nil, 'DanLib.UI.PopupBasis')
+    local Container = DCustomUtils(nil, 'DanLib.UI.PopupBasis')
     DANLIB_POPUPS = Container
     Container:BackgroundCloseButtonShow(false)
     Container:CloseButtonShow(false)
     Container:SetHeader(upper(title))
     
-    -- Wrap the text for display
-    Container.Text = utils:TextWrap(text, defaultFont, 400, true)
-    Container.buttonW = base:Scale(170)
+    -- Calculating the height using CalculateTextDimensions
+    local maxTextWidth = 400
+    local textData = CalculateTextDimensions(text, defaultFont, maxTextWidth)
+    
+    -- Store for rendering
+    Container.OriginalText = text
+    Container.MaxTextWidth = maxTextWidth
+    Container.buttonW = DBase:Scale(170)
 
-    -- Calculate text size and set pop-up dimensions
-    local text_h = utils:TextSize(Container.Text, defaultFont).h
-    Container:SetPopupWide(450)
-    Container:SetExtraHeight(80 + text_h)
+    -- Adding padding for visual comfort
+    local popupWidth = _max(450, textData.width + 50)
+    local textAreaHeight = textData.height
+    local buttonHeight = 30
+    local gapBetweenTextAndButtons = 15
+    local totalHeight = textAreaHeight + gapBetweenTextAndButtons + buttonHeight + 20
+    
+    Container:SetPopupWide(popupWidth)
+    Container:SetExtraHeight(totalHeight)
 
-    -- Create text area
-    local textArea = CustomUtils.Create(Container)
+    -- Create text area with proper height
+    local textArea = DCustomUtils(Container)
     textArea:PinMargin(TOP, 10, 10)
-    textArea:SetTall(20 + text_h)
+    textArea:SetTall(textAreaHeight)
     textArea:ApplyEvent(nil, function(_, w, h)
-        utils:DrawParseText(text, defaultFont, w / 2, 0, base:Theme('text'), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 400, TEXT_ALIGN_CENTER)
+        DUtils:DrawParseText(Container.OriginalText, defaultFont, w / 2, 0, DBase:Theme('text'), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, Container.MaxTextWidth, TEXT_ALIGN_CENTER)
     end)
 
     -- Create button container
-    Container.ButtonContainer = CustomUtils.Create(Container)
+    Container.ButtonContainer = DCustomUtils(Container)
     Container.ButtonContainer:PinMargin(BOTTOM, 10, 0, 10, 10)
-    Container.ButtonContainer:SetTall(30)
+    Container.ButtonContainer:SetTall(buttonHeight)
 
     -- Create cancel button if not suppressed
     if (not st) then
-        Container.ButtonContainer.ButtonCancel = base.CreateUIButton(Container.ButtonContainer, {
+        Container.ButtonContainer.ButtonCancel = DBase.CreateUIButton(Container.ButtonContainer, {
             background = { nil },
             dock_indent = { RIGHT, 6 },
             wide = Container.buttonW,
-            hover = { ColorAlpha(cancelColor, 50), nil, 6 },
+            hover = { _ColorAlpha(cancelColor, 50), nil, 6 },
             text = { cancelText, defaultFont, nil, nil, cancelColor },
             click = function()
                 Container:Close()
-                if cancelFunc then cancelFunc() end
+                if cancelFunc then
+                    cancelFunc()
+                end
             end
         })
     end
 
     -- Create confirm button
-    Container.ButtonContainer.ButtonConfirm = base.CreateUIButton(Container.ButtonContainer, {
+    Container.ButtonContainer.ButtonConfirm = DBase.CreateUIButton(Container.ButtonContainer, {
         background = { nil },
         dock_indent = { RIGHT, 6 },
         wide = Container.buttonW,
-        hover = { ColorAlpha(confirmColor, 50), nil, 6 },
+        hover = { _ColorAlpha(confirmColor, 50), nil, 6 },
         text = { confirmText, defaultFont, nil, nil, confirmColor },
         click = function()
             Container:Close()
-            if confirmFunc then confirmFunc() end
+            if confirmFunc then
+                confirmFunc()
+            end
         end
     })
+    
+    return Container
 end
 
-
 --- Displays a text input pop-up with optional confirmation and cancellation buttons.
--- This pop-up allows the user to enter text and provides options to confirm or cancel the input.
--- @param title (string): The title of the pop-up.
--- @param text (string): The description or message to display.
--- @param default (string): The default text for the text entry field (default: '').
--- @param confirmText (string): The text for the confirmation button (default: "Confirm").
--- @param confirmFunc (function): The function to call when the confirmation button is clicked.
--- @param cancelText (string): The text for the cancel button (default: "Cancel").
--- @param cancelFunc (function): The function to call when the cancel button is clicked.
+-- Automatically calculates height based on text content with color tag support.
+-- @param title (string): The title of the pop-up
+-- @param text (string): The description or message to display (supports color tags)
+-- @param default (string): The default text for the text entry field (default: '')
+-- @param confirmText (string): The text for the confirmation button (default: "Confirm")
+-- @param confirmFunc (function): The function to call when the confirmation button is clicked
+-- @param cancelText (string): The text for the cancel button (default: "Cancel")
+-- @param cancelFunc (function): The function to call when the cancel button is clicked
+-- @param verification (function): Optional validation function(text) -> boolean
 --
 -- Example Usage:
---    DanLib.Func:RequestTextPopup('Message Title', 'Please enter your input below:', 'Default Text',
---    function(input)
---        print('User  input:', input)
---    end, 'Cancel', function() 
---        print('User  cancelled the input.') 
---    end)
-function base:RequestTextPopup(title, text, default, confirmText, confirmFunc, cancelText, cancelFunc, verification)
+--    DBase:RequestTextPopup(
+--        'NEW CATEGORY',
+--        'Enter the name for the new report category\n{color:gray}Example: "Prop Abuse", "RDM"{/color:}',
+--        '',
+--        nil,
+--        function(input) print('User input:', input) end
+--    )
+function DBase:RequestTextPopup(title, text, default, confirmText, confirmFunc, cancelText, cancelFunc, verification)
     -- Setting default values
     default = default or ''
-    confirmText = confirmText or base:L('confirm')
-    cancelText = cancelText or base:L('cancel')
+    confirmText = confirmText or DBase:L('confirm')
+    cancelText = cancelText or DBase:L('cancel')
     title = title or 'No text'
     text = text or 'No text'
 
     -- Creating a container for a popup
-    local Container = CustomUtils.Create(nil, 'DanLib.UI.PopupBasis')
+    local Container = DCustomUtils(nil, 'DanLib.UI.PopupBasis')
     DANLIB_POPUPS = Container
     Container:BackgroundCloseButtonShow(false)
     Container:CloseButtonShow(false)
     Container:SetHeader(upper(title))
-    Container.Text = utils:TextWrap(text, defaultFont, 400, true)
-    Container.buttonW = base:Scale(150)
+    Container.buttonW = DBase:Scale(150)
 
-    local text_h = utils:TextSize(Container.Text, defaultFont).h
-    Container:SetPopupWide(450)
-    Container:SetExtraHeight(120 + text_h)
+    -- Calculate text dimensions
+    local maxTextWidth = 400
+    local textData = CalculateTextDimensions(text, defaultFont, maxTextWidth)
+    
+    Container.OriginalText = text
+    Container.MaxTextWidth = maxTextWidth
+    
+    -- Set dimensions
+    local popupWidth = _max(450, textData.width + 50)
+    local textAreaHeight = textData.height + 10
+    local textEntryHeight = 30
+    local buttonHeight = 30
+    local gaps = 15
+    local totalHeight = textAreaHeight + textEntryHeight + buttonHeight + gaps + 20
+    
+    Container:SetPopupWide(popupWidth)
+    Container:SetExtraHeight(totalHeight)
 
-    local textArea = CustomUtils.Create(Container)
+    -- Text area
+    local textArea = DCustomUtils(Container)
     textArea:PinMargin(TOP, 10, 10, 5)
-    textArea:SetTall(20 + text_h)
+    textArea:SetTall(textAreaHeight)
     textArea:ApplyEvent(nil, function(sl, w, h)
-        utils:DrawParseText(text, defaultFont, w / 2, 0, base:Theme('text'), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 400, TEXT_ALIGN_CENTER)
+        DUtils:DrawParseText(Container.OriginalText, defaultFont, w / 2, 0, DBase:Theme('text'), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, Container.MaxTextWidth, TEXT_ALIGN_CENTER)
     end)
 
-    Container.TextEntry = base.CreateTextEntry(Container)
+    -- Text entry
+    Container.TextEntry = DBase.CreateTextEntry(Container)
     Container.TextEntry:PinMargin(TOP, 10, nil, 15)
-    Container.TextEntry:SetTall(36)
+    Container.TextEntry:SetTall(textEntryHeight)
     Container.TextEntry:SetValue(default)
     Container.TextEntry:SetUpdateOnType(true)
     Container.TextEntry:RequestFocus()
 
-    Container.ButtonContainer = CustomUtils.Create(Container)
+    -- Button container
+    Container.ButtonContainer = DCustomUtils(Container)
     Container.ButtonContainer:PinMargin(BOTTOM, 10, nil, 10, 10)
-    Container.ButtonContainer:SetTall(30)
-
-    -- Create cancel button if not suppressed
-    Container.ButtonContainer.ButtonCancel = base.CreateUIButton(Container.ButtonContainer, {
+    Container.ButtonContainer:SetTall(buttonHeight)
+    
+    -- Cancel button
+    Container.ButtonContainer.ButtonCancel = DBase.CreateUIButton(Container.ButtonContainer, {
         background = { nil },
         dock_indent = { RIGHT, 6 },
         wide = Container.buttonW,
-        hover = { ColorAlpha(cancelColor, 50), nil, 6 },
+        hover = { _ColorAlpha(cancelColor, 50), nil, 6 },
         text = { cancelText, defaultFont, nil, nil, cancelColor },
         click = function()
             Container:Close()
-            if (cancelFunc) then cancelFunc() end
+            if cancelFunc then
+                cancelFunc()
+            end
         end
     })
-
-    -- Create confirm button
-    Container.ButtonContainer.ButtonConfirm = base.CreateUIButton(Container.ButtonContainer, {
+    
+    -- Confirm button
+    Container.ButtonContainer.ButtonConfirm = DBase.CreateUIButton(Container.ButtonContainer, {
         background = { nil },
         dock_indent = { RIGHT, 6 },
         wide = Container.buttonW,
-        hover = { ColorAlpha(confirmColor, 50), nil, 6 },
+        hover = { _ColorAlpha(confirmColor, 50), nil, 6 },
         text = { confirmText, defaultFont, nil, nil, confirmColor },
         click = function()
             local val = Container.TextEntry:GetValue()
             Container:Close()
-            if (confirmFunc) then confirmFunc(val) end
+            if confirmFunc then
+                confirmFunc(val)
+            end
         end
     })
 
-    -- Validation on text input
+    -- Validation
     if verification then
         Container.TextEntry.textEntry:ApplyEvent('OnTextChanged', function(sl)
             local text = Container.TextEntry:GetValue()
-            local isValid = verification and verification(text)
-            print(isValid)
+            local isValid = verification(text)
             Container.TextEntry:SetVerification(not isValid)
-            Container.ButtonContainer.ButtonConfirm:SetDisabled(not isValid) -- Deactivate the button if the input is invalid
+            Container.ButtonContainer.ButtonConfirm:SetEnabled(isValid)
         end)
-
-        -- Make sure that the confirmation button is active during initialisation
-        Container.TextEntry:SetVerification(false)
-        Container.ButtonContainer.ButtonConfirm:SetDisabled(false)
+        local initialValid = verification(default)
+        Container.TextEntry:SetVerification(not initialValid)
+        Container.ButtonContainer.ButtonConfirm:SetEnabled(initialValid)
     end
+    
+    return Container
 end
-
 
 --- Displays a color selection pop-up using a color mixer with confirmation and cancellation options.
 -- This pop-up allows the user to select a color and provides options to confirm or cancel the selection.
@@ -241,184 +302,201 @@ end
 --        'Cancel',                      -- Cancel button text
 --        OnColorCanceled                -- Cancellation callback
 --    )
-function base:RequestColorChangesPopup(title, default, confirmText, confirmFunc, cancelText, cancelFunc)
+function DBase:RequestColorChangesPopup(title, default, confirmText, confirmFunc, cancelText, cancelFunc)
     default = default or Color(255, 255, 255, 255)
     title = title or 'RGB Colors'
-    confirmText = confirmText or base:L('confirm')
-    cancelText = cancelText or base:L('cancel')
+    confirmText = confirmText or DBase:L('confirm')
+    cancelText = cancelText or DBase:L('cancel')
 
-    local Container = CustomUtils.Create(nil, 'DanLib.UI.PopupBasis')
+    local Container = DCustomUtils(nil, 'DanLib.UI.PopupBasis')
     DANLIB_POPUPS = Container
     Container:BackgroundCloseButtonShow(false)
     Container:CloseButtonShow(false)
     Container:SetHeader(upper(title))
-    Container.buttonW = base:Scale(150)
+    Container.buttonW = DBase:Scale(150)
     Container:SetPopupWide(300)
     Container:SetExtraHeight(350)
 
-    Container.MixerEntry = CustomUtils.Create(Container, 'DanLib.UI.ColorMixer')
+    Container.MixerEntry = DCustomUtils(Container, 'DanLib.UI.ColorMixer')
     Container.MixerEntry:Pin(nil, 10)
     Container.MixerEntry:SetAlphaBar(true)
     Container.MixerEntry:SetWangs(true)
     Container.MixerEntry:SetPalette(true)
     Container.MixerEntry:SetColor(default)
 
-    Container.ButtonContainer = CustomUtils.Create(Container)
+    Container.ButtonContainer = DCustomUtils(Container)
     Container.ButtonContainer:PinMargin(BOTTOM, 10, nil, 10, 10)
     Container.ButtonContainer:SetTall(30)
 
-    -- Create cancel button if not suppressed
-    Container.ButtonContainer.ButtonCancel = base.CreateUIButton(Container.ButtonContainer, {
+    Container.ButtonContainer.ButtonCancel = DBase.CreateUIButton(Container.ButtonContainer, {
         background = { nil },
         dock_indent = { RIGHT, 6 },
         wide = Container.buttonW,
-        hover = { ColorAlpha(cancelColor, 50), nil, 6 },
+        hover = { _ColorAlpha(cancelColor, 50), nil, 6 },
         text = { cancelText, defaultFont, nil, nil, cancelColor },
         click = function()
             Container:Close()
-            if cancelFunc then cancelFunc() end
+            if cancelFunc then
+                cancelFunc()
+            end
         end
     })
 
-    -- Create confirm button
-    Container.ButtonContainer.ButtonConfirm = base.CreateUIButton(Container.ButtonContainer, {
+    Container.ButtonContainer.ButtonConfirm = DBase.CreateUIButton(Container.ButtonContainer, {
         background = { nil },
         dock_indent = { RIGHT, 6 },
         wide = Container.buttonW,
-        hover = { ColorAlpha(confirmColor, 50), nil, 6 },
+        hover = { _ColorAlpha(confirmColor, 50), nil, 6 },
         text = { confirmText, defaultFont, nil, nil, confirmColor },
         click = function()
             local val = Container.MixerEntry:GetColor()
             Container:Close()
-            if (confirmFunc) then confirmFunc(val) end
+            if confirmFunc then
+                confirmFunc(val)
+            end
         end
     })
 
     return Container, Container.MixerEntry
 end
 
-
 --- Displays a combo box selection pop-up with optional confirmation and cancellation buttons.
--- This pop-up allows the user to select an option from a combo box and provides options to confirm or cancel the selection.
--- @param title (string): The title of the pop-up (default: 'No text').
--- @param text (string): The description or message to display (default: 'No text').
--- @param sOptions (table): A table of options to display in the combo box.
--- @param default (string): The default selected option in the combo box (default: '').
--- @param confirmText (string): The text for the confirmation button (default: 'Confirm').
--- @param confirmFunc (function): The function to call when the confirmation button is clicked, receiving the selected value and data.
--- @param cancelText (string): The text for the cancel button (default: 'Cancel').
--- @param cancelFunc (function): The function to call when the cancel button is clicked.
+-- Automatically calculates height based on text content with color tag support.
+-- @param title (string): The title of the pop-up
+-- @param text (string): The description or message to display (supports color tags)
+-- @param options (table): Table of options for the combo box
+-- @param default (any): The default selected option
+-- @param confirmText (string): The text for the confirmation button (default: "Confirm")
+-- @param confirmFunc (function): The function to call when the confirmation button is clicked
+-- @param cancelText (string): The text for the cancel button (default: "Cancel")
+-- @param cancelFunc (function): The function to call when the cancel button is clicked
 --
 -- Example Usage:
---    local function OnOptionConfirmed(value, data)
---        print('Selected option:', value, 'with data:', data)
---    end
---
---    local function OnOptionCanceled()
---        print('Option selection canceled.')
---    end
---
---    DanLib.Func:ComboRequestPopup(
---        'Choose an Option',                   -- Title
---        'Please select an option below:',     -- Description text
---        {'Option 1', 'Option 2', 'Option 3'}, -- Options
---        'Option 1',                           -- Default option
---        'Confirm',                            -- Confirmation button text
---        OnOptionConfirmed,                    -- Confirmation callback
---        'Cancel',                             -- Cancel button text
---        OnOptionCanceled                      -- Cancellation callback
+--    DBase:ComboRequestPopup(
+--        'SELECT REASON',
+--        'Choose the report category:\n{color:gray}This will be visible to all staff members{/color:}',
+--        { 'RDM', 'RDA', 'Prop Abuse', 'Harassment' },
+--        'RDM',
+--        nil,
+--        function(selected) print('Selected:', selected) end
 --    )
-function base:ComboRequestPopup(title, text, sOptions, default, confirmText, confirmFunc, cancelText, cancelFunc)
-    default = default or ''
-    confirmText = confirmText or base:L('confirm')
-    cancelText = cancelText or base:L('cancel')
+function DBase:ComboRequestPopup(title, text, options, default, confirmText, confirmFunc, cancelText, cancelFunc)
+    -- Setting default values
+    options = options or {}
+    default = default or nil
+    confirmText = confirmText or DBase:L('confirm')
+    cancelText = cancelText or DBase:L('cancel')
     title = title or 'No text'
     text = text or 'No text'
 
-    local Container = CustomUtils.Create(nil, 'DanLib.UI.PopupBasis')
+    -- Creating a container for a popup
+    local Container = DCustomUtils(nil, 'DanLib.UI.PopupBasis')
     DANLIB_POPUPS = Container
+    Container:BackgroundCloseButtonShow(false)
+    Container:CloseButtonShow(false)
     Container:SetHeader(upper(title))
-    Container.Text = utils:TextWrap(text, defaultFont, 400, true)
-    Container.buttonW = base:Scale(150)
+    Container.buttonW = DBase:Scale(150)
 
-    local text_h = utils:TextSize(Container.Text, defaultFont).h
-    Container:SetPopupWide(450)
-    Container:SetExtraHeight(120 + text_h)
+    -- Calculate text dimensions
+    local maxTextWidth = 400
+    local textData = CalculateTextDimensions(text, defaultFont, maxTextWidth)
+    
+    Container.OriginalText = text
+    Container.MaxTextWidth = maxTextWidth
 
-    local textArea = CustomUtils.Create(Container)
+    -- Set dimensions
+    local popupWidth = _max(450, textData.width + 50)
+    local textAreaHeight = textData.height + 10
+    local comboBoxHeight = 30
+    local buttonHeight = 30
+    local gaps = 15
+    local totalHeight = textAreaHeight + comboBoxHeight + buttonHeight + gaps + 20
+    
+    Container:SetPopupWide(popupWidth)
+    Container:SetExtraHeight(totalHeight)
+
+    -- Text area
+    local textArea = DCustomUtils(Container)
     textArea:PinMargin(TOP, 10, 10, 5)
-    textArea:SetTall(20 + text_h)
+    textArea:SetTall(textAreaHeight)
     textArea:ApplyEvent(nil, function(sl, w, h)
-        utils:DrawParseText(text, defaultFont, w / 2, 0, base:Theme('text'), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 400, TEXT_ALIGN_CENTER)
+        DUtils:DrawParseText(Container.OriginalText, defaultFont, w / 2, 0, DBase:Theme('text'), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, Container.MaxTextWidth, TEXT_ALIGN_CENTER)
     end)
 
-    Container.comboSelect = base.CreateUIComboBox(Container)
-    Container.comboSelect:PinMargin(TOP, 10, nil, 10)
-    Container.comboSelect:SetTall(35)
-    Container.comboSelect:SetFont(defaultFont)
-    Container.comboSelect:SetValue(default)
-    Container.comboSelect:SetDirection(10)
-
-    for k, v in pairs(sOptions) do
-        Container.comboSelect:AddChoice(v, k, default == k or default == v)
+    -- Combo box
+    Container.ComboBox = DBase.CreateUIComboBox(Container)
+    Container.ComboBox:PinMargin(TOP, 10, nil, 15)
+    Container.ComboBox:SetTall(comboBoxHeight)
+    
+    -- Populate combo box with options
+    for k, v in pairs(options) do
+        Container.ComboBox:AddChoice(v, k)
+    end
+    
+    -- Set default value if provided
+    if default then
+        Container.ComboBox:SetValue(default)
     end
 
-    Container.ButtonContainer = CustomUtils.Create(Container)
+    -- Button container
+    Container.ButtonContainer = DCustomUtils(Container)
     Container.ButtonContainer:PinMargin(BOTTOM, 10, nil, 10, 10)
-    Container.ButtonContainer:SetTall(30)
+    Container.ButtonContainer:SetTall(buttonHeight)
 
-    -- Create cancel button if not suppressed
-    Container.ButtonContainer.ButtonCancel = base.CreateUIButton(Container.ButtonContainer, {
+    -- Cancel button
+    Container.ButtonContainer.ButtonCancel = DBase.CreateUIButton(Container.ButtonContainer, {
         background = { nil },
         dock_indent = { RIGHT, 6 },
         wide = Container.buttonW,
-        hover = { ColorAlpha(cancelColor, 50), nil, 6 },
+        hover = { _ColorAlpha(cancelColor, 50), nil, 6 },
         text = { cancelText, defaultFont, nil, nil, cancelColor },
         click = function()
             Container:Close()
-            if (cancelFunc) then cancelFunc() end
-        end
-    })
-
-    -- Create confirm button
-    Container.ButtonContainer.ButtonConfirm = base.CreateUIButton(Container.ButtonContainer, {
-        background = { nil },
-        dock_indent = { RIGHT, 6 },
-        wide = Container.buttonW,
-        hover = { ColorAlpha(confirmColor, 50), nil, 6 },
-        text = { confirmText, defaultFont, nil, nil, confirmColor },
-        click = function()
-            local value, data = Container.comboSelect:GetSelected()
-            if (value and data) then
-                if confirmFunc then confirmFunc(value, data) end
-                Container:Close()
-            else
-                base:ScreenNotification('ERROR', 'You need to select a value!', 'ERROR')
+            if cancelFunc then
+                cancelFunc()
             end
         end
     })
+
+    -- Confirm button
+    Container.ButtonContainer.ButtonConfirm = DBase.CreateUIButton(Container.ButtonContainer, {
+        background = { nil },
+        dock_indent = { RIGHT, 6 },
+        wide = Container.buttonW,
+        hover = { _ColorAlpha(confirmColor, 50), nil, 6 },
+        text = { confirmText, defaultFont, nil, nil, confirmColor },
+        click = function()
+            local selectedValue = Container.ComboBox:GetSelected()
+            local selectedText = Container.ComboBox:GetValue()
+            Container:Close()
+            if confirmFunc then 
+                confirmFunc(selectedText, selectedValue) 
+            end
+        end
+    })
+    
+    return Container
 end
 
 
 
-
 -- Editor pop-up
-function base:EditorPopup(title, sCode, confirmText, confirmFunc, cancelText, cancelFunc)
+function DBase:EditorPopup(title, sCode, confirmText, confirmFunc, cancelText, cancelFunc)
     title = title or 'No text'
 
-    confirmText = confirmText or base:L('confirm')
-    cancelText = cancelText or base:L('cancel')
+    confirmText = confirmText or DBase:L('confirm')
+    cancelText = cancelText or DBase:L('cancel')
 
-    local Container = CustomUtils.Create(nil, 'DanLib.UI.PopupBasis')
+    local Container = DCustomUtils(nil, 'DanLib.UI.PopupBasis')
     DANLIB_POPUPS = Container
     Container:SetHeader(upper(title))
-    Container.buttonW = base:Scale(150)
+    Container.buttonW = DBase:Scale(150)
     Container:SetPopupWide(650)
     Container:SetExtraHeight(300)
 
     local Margin = 6
 
-    local editor = base.CreateHTML(Container)
+    local editor = DBase.CreateHTML(Container)
     editor:PinMargin(TOP, Margin, Margin, Margin)
     editor:SetTall(240)
     editor.Code = sCode or ''
@@ -456,12 +534,12 @@ function base:EditorPopup(title, sCode, confirmText, confirmFunc, cancelText, ca
         self:Call('SetContent(\"' .. self:JavascriptSafe(code) .. '\");')
     end
 
-    Container.ButtonContainer = DanLibCustomUtils.Create(Container)
+    Container.ButtonContainer = DCustomUtils(Container)
     Container.ButtonContainer:PinMargin(BOTTOM, 10, nil, 10, 10)
     Container.ButtonContainer:SetTall(30)
 
     -- Button cancel
-    Container.ButtonContainer.ButtonCancel = base:CreateButton(Container.ButtonContainer, cancelText, defaultFont)
+    Container.ButtonContainer.ButtonCancel = DBase:CreateButton(Container.ButtonContainer, cancelText, defaultFont)
     Container.ButtonContainer.ButtonCancel:PinMargin(RIGHT, 10)
     Container.ButtonContainer.ButtonCancel:SetWide(Container.buttonW)
     function Container.ButtonContainer.ButtonCancel:DoClick()
@@ -470,7 +548,7 @@ function base:EditorPopup(title, sCode, confirmText, confirmFunc, cancelText, ca
     end
 
     -- Button confirm
-    Container.ButtonContainer.ButtonConfirm = base:CreateButton(Container.ButtonContainer, confirmText, defaultFont)
+    Container.ButtonContainer.ButtonConfirm = DBase:CreateButton(Container.ButtonContainer, confirmText, defaultFont)
     Container.ButtonContainer.ButtonConfirm:PinMargin(RIGHT, 10)
     Container.ButtonContainer.ButtonConfirm:SetWide(Container.buttonW)
     function Container.ButtonContainer.ButtonConfirm:DoClick()
@@ -480,7 +558,7 @@ function base:EditorPopup(title, sCode, confirmText, confirmFunc, cancelText, ca
 end
 
 -- concommand.Add('EditorPopup', function()
---     base.EditorPopup(
+--     DBase.EditorPopup(
 
 --     )
 -- end)
