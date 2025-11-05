@@ -119,8 +119,15 @@ elseif (SERVER) then
     AddCSLuaFile('danlib/sv_init.lua') 
     include('danlib/sv_init.lua')
 
+    -- Resources
     resource.AddFile('resource/fonts/montserrat-medium.ttf')
     resource.AddFile('resource/fonts/montserrat-regular.ttf')
+    
+    -- UI Sounds
+    resource.AddFile('sound/ddi/button-click.wav')
+    resource.AddFile('sound/ddi/button-hover.wav')
+    resource.AddFile('sound/ddi/error.mp3')
+    resource.AddFile('sound/ddi/notifications.wav')
 end
 
 include('danlib/sh_init.lua')
