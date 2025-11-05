@@ -554,8 +554,16 @@ function panelClasses:ApplySound(pathHover, pathClick)
     end
 
     if pathClick then
-        self:ApplyEvent('OnRelease', function()
-            surface_play_sound(pathClick)
+        local lastClickTime = 0
+        self:ApplyEvent('OnMouseReleased', function(sl, keyCode)
+            if (keyCode == MOUSE_LEFT or keyCode == MOUSE_RIGHT) then
+                local currentTime = CurTime()
+                -- Spam protection: minimum 0.1 seconds between clicks
+                if (currentTime - lastClickTime > 0.1) then
+                    surface_play_sound(pathClick)
+                    lastClickTime = currentTime
+                end
+            end
         end)
     end
     
