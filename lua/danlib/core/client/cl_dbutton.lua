@@ -145,19 +145,28 @@ end
 -- @param options.wide number: The width of the button.
 -- @param options.tall number: The height of the button.
 -- @param options.click function: The function to call when the button is clicked.
+-- @param options.rclick function: The function to call when the button is right-clicked.
 -- @param options.tooltip table: A table containing tooltip text, color, icon, and position.
--- @param options.icon string: The icon displayed on the button (default: '').
--- @param options.iconSize number: The size of the icon (default: 18).
--- @param options.iconColor Color: The color of the icon (default: Theme material color).
+-- @param options.icon table: A table containing icon, color, and size.
 -- @param options.paint function: A custom paint function for the button.
--- @param options.hoverClick table: A table for hover click effects.
+-- @param options.hoverClick table: A table for hover click effects (ripple effect).
+-- @param options.think function: Custom Think function called every frame.
+-- @param options.sound table: A table containing sound paths {hoverSound, clickSound}.
 -- @return DButton: Returns the button instance for method chaining.
 --
 -- @note: The `think` function can be used to implement custom behavior that needs to be updated 
 -- every frame (e.g., animations, state changes). To use it, provide a function in the options 
 -- table under the `think` key. The function will receive the button instance as its first argument.
+--
+-- @example:
+-- DBase.CreateUIButton(parent, {
+--     text = { 'Click Me', 'danlib_font_18', nil, nil, Color(255, 255, 255) },
+--     background = { Color(50, 50, 50), 6 },
+--     hover = { Color(255, 255, 255, 30), 8, 6 },
+--     sound = { 'buttons/button15.wav', 'buttons/button14.wav' },
+--     click = function() print('Clicked!') end
+-- })
 function DBase.CreateUIButton(parent, options)
-    parent = parent or nil
     options = options or {}
     local button = DCustomUtils(parent, 'DButton')
     button:SetText('')
@@ -165,144 +174,112 @@ function DBase.CreateUIButton(parent, options)
 
     -- Helper to check if key exists in options table
     local function hasKey(key)
-        for k in pairs(options) do
-            if (k == key) then
-                return true
-            end
-        end
-        return false
+        return options[key] ~= nil
     end
 
     -- Helper function to normalize options (supports both nil and {nil} formats)
     local function normalizeOption(opt)
-        if (opt == nil) then
-            return {nil}
-        elseif (type(opt) == 'table') then
-            return opt
-        else
-            return { opt }
+        return type(opt) == 'table' and opt or {opt}
+    end
+    
+    -- Helper to wrap event with disabled check
+    local function wrapDisabledCheck(eventName, originalFunc)
+        local original = button[eventName]
+        button[eventName] = function(sl, ...)
+            if (not sl:GetDisabled() and original) then
+                return original(sl, ...)
+            end
         end
     end
+
+    -- Auto cursor management based on enabled state
+    local originalSetEnabled = button.SetEnabled
+    button.SetEnabled = function(sl, enabled)
+        originalSetEnabled(sl, enabled)
+        sl:SetCursor(enabled and 'hand' or 'no')
+        return sl
+    end
+    button:SetCursor('hand')
 
     -- Background settings
     if hasKey('background') then
         local background = normalizeOption(options.background)
-        local backgroundColor
-        
-        if background[1] then
-            backgroundColor = IsColor(background[1]) and background[1] or DBase:Theme('button')
-        else
-            backgroundColor = Color(0, 0, 0, 0)
-        end
-        
-        local cornerRadius = background[2] or 6
-        local rounding = background[3]
-        button:ApplyBackground(backgroundColor, cornerRadius, rounding)
+        local backgroundColor = background[1] and (IsColor(background[1]) and background[1] or DBase:Theme('button')) or Color(0, 0, 0, 0)
+        button:ApplyBackground(backgroundColor, background[2] or 6, background[3])
     else
-        -- Key not present - use default
         button:ApplyBackground(DBase:Theme('button'), 6, nil)
     end
 
-    -- Hover settings
-    if hasKey('hover') then
-        local hover = normalizeOption(options.hover)
-        local hoverColor
-        
-        if hover[1] then
-            hoverColor = IsColor(hover[1]) and hover[1] or DBase:Theme('button_hovered')
-        else
-            hoverColor = Color(0, 0, 0, 0)
-        end
-        
-        local hoverSpeed = hover[2]
-        local hoverRad = hover[3] or 6
-        
-        if hoverColor.a > 0 then
-            button:ApplyFadeHover(hoverColor, hoverSpeed, hoverRad)
-            
-            local originalThink = button.Think
-            button.Think = function(sl)
-                if originalThink then
-                    originalThink(sl)
-                end
-                if sl:GetDisabled() then
-                    sl.HoverFade = 0
-                end
-            end
-        end
-    else
-        -- Key not present - use default
-        local hoverColor = DBase:Theme('button_hovered')
-        button:ApplyFadeHover(hoverColor, nil, 6)
-        
+    -- Hover settings with Think hook
+    local function setupHoverThink()
         local originalThink = button.Think
         button.Think = function(sl)
-            if originalThink then
-                originalThink(sl)
-            end
+            if originalThink then originalThink(sl) end
             if sl:GetDisabled() then
                 sl.HoverFade = 0
             end
         end
     end
 
+    if hasKey('hover') then
+        local hover = normalizeOption(options.hover)
+        local hoverColor = hover[1] and (IsColor(hover[1]) and hover[1] or DBase:Theme('button_hovered')) or Color(0, 0, 0, 0)
+        
+        if hoverColor.a > 0 then
+            button:ApplyFadeHover(hoverColor, hover[2], hover[3] or 6)
+            setupHoverThink()
+        end
+    else
+        button:ApplyFadeHover(DBase:Theme('button_hovered'), nil, 6)
+        setupHoverThink()
+    end
+
     -- Text
     if hasKey('text') then
         local text = normalizeOption(options.text)
-        local textStr = text[1]
-        local textFont = text[2]
-        local textX = text[3]
-        local textY = text[4]
-        local textColor = (IsColor(text[5])) and text[5] or DBase:Theme('text')
-        local textXalign = text[6]
-        local textYalign = text[7]
-        button:ApplyText(textStr, textFont, textX, textY, textColor, textXalign, textYalign)
+        button:ApplyText(text[1], text[2], text[3], text[4], IsColor(text[5]) and text[5] or DBase:Theme('text'), text[6], text[7])
     end
 
     -- Docking options
     if hasKey('dock') then
         local dock = normalizeOption(options.dock)
         if dock[1] then
-            local dockPos = dock[1]
-            local indent = dock[2] or 0
-            button:Pin(dockPos, indent)
+            button:Pin(dock[1], dock[2] or 0)
         end
     end
 
     if hasKey('dock_indent') then
         local dockIndent = normalizeOption(options.dock_indent)
-        local dockPos = dockIndent[1]
-        local indent1 = dockIndent[2] or 0
-        local indent2 = dockIndent[3] or 0
-        local indent3 = dockIndent[4] or 0
-        local indent4 = dockIndent[5] or 0
-        button:Dock(dockPos)
-        button:DockMargin(indent1, indent2, indent3, indent4)
+        button:Dock(dockIndent[1])
+        button:DockMargin(dockIndent[2] or 0, dockIndent[3] or 0, dockIndent[4] or 0, dockIndent[5] or 0)
     end
 
-    -- Position setting
-    if hasKey('pos') then
-        button:SetPos(unpack(options.pos))
+    -- Position and size
+    if hasKey('pos') then button:SetPos(unpack(options.pos)) end
+    if hasKey('size') then button:SetSize(unpack(options.size)) end
+    if hasKey('wide') then button:SetWide(options.wide) end
+    if hasKey('tall') then button:SetTall(options.tall) end
+
+    -- Sound effects (default enabled)
+    local function applySoundsWithDisabledCheck(hoverSound, clickSound)
+        button:ApplySound(hoverSound, clickSound)
+        if hoverSound then wrapDisabledCheck('OnCursorEntered') end
+        if clickSound then wrapDisabledCheck('OnMouseReleased') end
     end
 
-    -- Setting the button size
-    if hasKey('size') then
-        button:SetSize(unpack(options.size))
-    end
-
-    if hasKey('wide') then
-        button:SetWide(options.wide)
-    end
-
-    if hasKey('tall') then
-        button:SetTall(options.tall)
+    if hasKey('sound') then
+        local sound = normalizeOption(options.sound)
+        if (sound[1] or sound[2]) then
+            applySoundsWithDisabledCheck(sound[1], sound[2])
+        end
+    else
+        applySoundsWithDisabledCheck('ddi/button-hover.wav', 'ddi/button-click.wav')
     end
 
     -- Click processing
     if hasKey('click') then
         button:ApplyEvent('DoClick', options.click or function() end)
     end
-
     if hasKey('rclick') then
         button:ApplyEvent('DoRightClick', options.rclick or function() end)
     end
@@ -310,21 +287,16 @@ function DBase.CreateUIButton(parent, options)
     -- Tooltip settings
     if hasKey('tooltip') then
         local tooltip = normalizeOption(options.tooltip)
-        local text = tooltip[1]
-        local color = tooltip[2]
-        local tooltipColor = (color and IsColor(color)) and color or nil
-        local icon = tooltip[3]
-        local indent = tooltip[4]
-        button:ApplyTooltip(text, tooltipColor, icon, indent)
+        local tooltipColor = tooltip[2] and IsColor(tooltip[2]) and tooltip[2] or nil
+        button:ApplyTooltip(tooltip[1], tooltipColor, tooltip[3], tooltip[4])
     end
 
+    -- Think
     if hasKey('think') then
-        button:ApplyEvent('Think', function(self, w, h)
-            return options.think(self, w, h)
-        end)
+        button:ApplyEvent('Think', options.think)
     end
 
-    -- Button drawing function
+    -- Paint with icon
     button:ApplyEvent(nil, function(self, w, h)
         if hasKey('paint') then
             return options.paint(self, w, h)
@@ -332,41 +304,19 @@ function DBase.CreateUIButton(parent, options)
         
         if hasKey('icon') then
             local icon = normalizeOption(options.icon)
-            local iconStr = icon[1] or ''
-            local iconColor = (IsColor(icon[2])) and icon[2] or DBase:Theme('mat', 150)
-            local iconSize = icon[3] or 18
-            local IconSize = DBase:Scale(iconSize)
-            local iconPosX = w * 0.5 - IconSize * 0.5
-            local iconPosY = h * 0.5 - IconSize * 0.5
-            utils:DrawIconOrMaterial(iconPosX, iconPosY, IconSize, iconStr, iconColor)
+            local iconSize = DBase:Scale(icon[3] or 18)
+            local iconColor = IsColor(icon[2]) and icon[2] or DBase:Theme('mat', 150)
+            utils:DrawIconOrMaterial((w - iconSize) * 0.5, (h - iconSize) * 0.5, iconSize, icon[1] or '', iconColor)
         end
-        
-        return self
     end)
 
     -- Hover click effects
     if hasKey('hoverClick') then
         local hoverClick = normalizeOption(options.hoverClick)
-        local hoverClickColor
-        
-        if hoverClick[1] then
-            hoverClickColor = IsColor(hoverClick[1]) and hoverClick[1] or nil
-        else
-            hoverClickColor = Color(0, 0, 0, 0)
-        end
-
-        local hoverClickSpeed = hoverClick[2]
-        local hoverClickRadius = hoverClick[3]
-        
+        local hoverClickColor = hoverClick[1] and (IsColor(hoverClick[1]) and hoverClick[1] or nil) or Color(0, 0, 0, 0)
         if (hoverClickColor and hoverClickColor.a > 0) then
-            button:ApplyCircleEffect(hoverClickColor, hoverClickSpeed, hoverClickRadius)
-            
-            local originalOnMousePressed = button.OnMousePressed
-            button.OnMousePressed = function(sl, keyCode)
-                if (not sl:GetDisabled() and originalOnMousePressed) then
-                    originalOnMousePressed(sl, keyCode)
-                end
-            end
+            button:ApplyCircleEffect(hoverClickColor, hoverClick[2], hoverClick[3])
+            wrapDisabledCheck('OnMousePressed')
         end
     end
 
