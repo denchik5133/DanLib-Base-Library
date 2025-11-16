@@ -17,29 +17,49 @@
 
 
 
-local clamp = math.Clamp
-local max = math.max
+local DBase = DanLib.Func
+local FRAME = DanLib.UiPanel()
+local DUtils = DanLib.Utils
+local DUI = DanLib.UI
+local DCustomUtils = DanLib.CustomUtils.Create
 
-local mouseX = gui.MouseX
-local mouseY = gui.MouseY
-
-local SW = ScrW
-local SH = ScrH
-
-local base = DanLib.Func
-local PANEL, _ = DanLib.UiPanel()
-local utils = DanLib.Utils
-local customUtils = DanLib.CustomUtils
+-- Localized functions for performance
+local _mathClamp = math.Clamp
+local _guiMouseX = gui.MouseX
+local _guiMouseY = gui.MouseY
+local _guiMousePos = gui.MousePos
+local _IsValid = IsValid
+local _drawSimpleText = draw.SimpleText
+local _ScrW = ScrW
+local _ScrH = ScrH
+local _pairs = pairs
+local _SysTime = SysTime
+local _timerSimple = timer.Simple
+local _hookAdd = hook.Add
+local _hookRemove = hook.Remove
+local _vguiCursorVisible = vgui.CursorVisible
+local _guiEnableScreenClicker = gui.EnableScreenClicker
+local _inputIsKeyDown = input.IsKeyDown
+local _inputIsMouseDown = input.IsMouseDown
+local _stringFormat = string.format
+local _TEXT_ALIGN_LEFT = TEXT_ALIGN_LEFT
+local _TEXT_ALIGN_TOP = TEXT_ALIGN_TOP
+local _TEXT_ALIGN_RIGHT = TEXT_ALIGN_RIGHT
+local _TEXT_ALIGN_CENTER = TEXT_ALIGN_CENTER
+local _TEXT_ALIGN_BOTTOM = TEXT_ALIGN_BOTTOM
 
 DanLib.Frames = {}
 
--- Function for setting onCloseFunc
-function PANEL:SetOnCloseFunc(func)
+--- Sets a callback function to be called when the frame is closed.
+-- @param func (function): Callback function to execute on close.
+function FRAME:SetOnCloseFunc(func)
     self.onCloseFunc = func
 end
 
---- Closes the frame with the option to call the callback function.
-function PANEL:CloseFrame()
+--- Closes the frame with optional callback and fade-out animation.
+-- If removeOnClose is true, the frame is removed after animation.
+-- Otherwise, the frame is hidden.
+function FRAME:CloseFrame()
     if self.onCloseFunc then self.onCloseFunc() end
 
     if self.removeOnClose then
@@ -52,267 +72,488 @@ function PANEL:CloseFrame()
     end
 end
 
-function PANEL:Init()
+--- Initializes the frame with default settings and creates the top panel.
+-- Sets up dragging functionality, creates title label and close button.
+function FRAME:Init()
     self:CustomUtils()
     self:ApplyAttenuation(0.2)
 
-    -- Flag for transparency tracking
+    -- Internal flags
     self.IsTransparent = false
-    -- Flag to track the change in size
     self.IsResizing = false
-    -- Customising the control buttons
+    
+    -- Configure default settings
     self.btnMaxim:Hide()
     self.btnMinim:Hide()
+    self:SetMinHeight(100)
+    self:SetMinWidth(100)
     self.lblTitle:SetText('')
     self.removeOnClose = true
-    -- Sets whether or not the shadow effect bordering the DFrame should be drawn.
     self:SetPaintShadow(true)
-    -- Sets the dock padding of the panel.
-    -- The dock padding is the extra space that will be left around the edge when child elements are docked inside this element.
     self:DockPadding(0, 0, 0, 0)
-    -- Sets whether or not the DFrame can be resized by the user.
-    -- This is achieved by clicking and dragging in the bottom right corner of the frame.
-    -- self:SetSizable(true)
-    -- Sets whether the DFrame is restricted to the boundaries of the screen resolution.
     self:SetScreenLock(true)
     self.btnClose:SetVisible(false)
 
     -- Creating the top panel
-    self.top = customUtils.Create(self)
+    self.top = DCustomUtils(self)
     self.top:Pin(TOP)
     self.top:SetTall(30)
     self.top:DockPadding(0, 0, 0, 2)
     self.top:SetCursor('arrow')
-    -- self.top:ApplyBackground(base:Theme('secondary'))
-    self.top:ApplyEvent(nil, function(sl, w, h)
-        utils:DrawRoundedTopBox(0, 0, w, h, base:Theme('secondary'))
-    end)
+    self.top:ApplyBackground(DBase:Theme('secondary'), 6, { true, true, false, false })
 
-    -- Handling drag and drop
+    -- Localized variables for closure
+    local top = self.top
+    local scrW = _ScrW()
+    local scrH = _ScrH()
+    
+    --- Starts dragging the window when top panel is clicked.
+    -- Validates cursor is within screen bounds before starting.
     local function startDragging()
-        self.Dragging = { gui.MouseX() - self.x, gui.MouseY() - self.y }
+        local mousex = _guiMouseX()
+        local mousey = _guiMouseY()
+        
+        if (mousex < 0 or mousex > scrW or mousey < 0 or mousey > scrH) then
+            return
+        end
+        
+        self.DraggingWindow = {
+            mousex - self.x,
+            mousey - self.y
+        }
+        top:SetCursor('sizeall')
     end
-
-    self.top.OnMousePressed = startDragging
-    self.top.OnMouseReleased = function() self.Dragging = nil end
+    
+    top.OnMousePressed = startDragging
+    top.OnMouseReleased = function()
+        self.DraggingWindow = nil
+        top:SetCursor('arrow')
+    end
 
     -- Creating a header
-    self.title = customUtils.Create(self.top, 'DLabel')
+    self.title = DBase:CreateLabel(top, '', 'danlib_font_18')
     self.title:PinMargin(LEFT, 10)
-    self.title:SetFont('danlib_font_20')
-    self.title:SetTextColor(base:Theme('text'))
+    self.title:SetTextColor(DBase:Theme('text'))
 
     -- Creating a close button
-    self.closeBtn = base:CreateButton(self.top)
-    self.closeBtn:Pin(RIGHT)
-    self.closeBtn:SetWide(30)
-    self.closeBtn:ApplyTooltip(base:L('#close'), nil, nil, TOP)
-    self.closeBtn:icon('jWj7VqX', 24)
-    self.closeBtn:SetHoverTum(true)
-    self.closeBtn:SetBackgroundColor(Color(0, 0, 0, 0))
-    self.closeBtn.DoClick = function() self:CloseFrame() end
+    self.closeBtn = DBase.CreateUIButton(top, {
+        background = false,
+        hover = false,
+        hoverClick = false,
+        wide = 30,
+        dock = { RIGHT },
+        tooltip = { DBase:L('#close'), nil, nil, TOP },
+        icon = { 'jWj7VqX', 24 },
+        click = function()
+            self:CloseFrame()
+        end
+    })
+
+    -- Think hook for processing window dragging
+    local baseThink = self.Think
+    self:ApplyEvent('Think', function(sl)
+        if baseThink then baseThink(sl) end
+        
+        local dragging = sl.DraggingWindow
+        if (dragging and type(dragging) == 'table') then
+            local mousex = _guiMouseX()
+            local mousey = _guiMouseY()
+            
+            -- Stop dragging if cursor leaves screen
+            if (mousex < 0 or mousex > scrW or mousey < 0 or mousey > scrH) then
+                sl.DraggingWindow = nil
+                top:SetCursor('arrow')
+                return
+            end
+            
+            -- Clamp cursor to screen bounds
+            mousex = _mathClamp(mousex, 1, scrW - 1)
+            mousey = _mathClamp(mousey, 1, scrH - 1)
+            
+            local x = mousex - dragging[1]
+            local y = mousey - dragging[2]
+            
+            -- Clamp window position if screen lock is enabled
+            if sl:GetScreenLock() then
+                x = _mathClamp(x, 0, scrW - sl:GetWide())
+                y = _mathClamp(y, 0, scrH - sl:GetTall())
+            end
+            
+            sl:SetPos(x, y)
+        end
+    end)
 end
 
---- Sets the function for the settings button.
--- @param show (boolean): Whether to show the button.
--- @param func (function): Function to execute when pressed.
-function PANEL:SetSettingsFunc(func)
-    self.settingsBtn = base:CreateButton(self.top)
-    self.settingsBtn:Pin(RIGHT)
-    self.settingsBtn:SetWide(30)
-    self.settingsBtn:ApplyTooltip(base:L('#settings'), nil, nil, TOP)
-    self.settingsBtn:icon('lgHTnoN', 24)
-    self.settingsBtn:SetHoverTum(true)
-    self.settingsBtn:SetBackgroundColor(Color(0, 0, 0, 0))
-    self.settingsBtn.DoClick = func or function() end
+--- Adds a settings button to the frame's top panel.
+-- @param func (function): Function to execute when settings button is clicked.
+-- @return (Panel): Returns self for method chaining.
+function FRAME:SetSettingsFunc(func)
+    DBase.CreateUIButton(self.top, {
+        background = false,
+        hover = false,
+        hoverClick = false,
+        wide = 30,
+        dock = { RIGHT },
+        tooltip = { DBase:L('#settings'), nil, nil, TOP },
+        icon = { 'lgHTnoN', 24 },
+        click = func or function() end
+    })
+    return self
 end
 
--- Создание кнопки прозрачности
-function PANEL:Transparency()
-    self.transparencyBtn = base:CreateButton(self.top)
-    self.transparencyBtn:Pin(RIGHT)
-    self.transparencyBtn:SetWide(30)
-    self.transparencyBtn:ApplyTooltip('Toggle transparency', nil, nil, TOP)
-    self.transparencyBtn:icon('K3QJsue', 24)
-    self.transparencyBtn:SetHoverTum(true)
-    self.transparencyBtn:SetBackgroundColor(Color(0, 0, 0, 0))
-
-    local initialTransparency = 80 -- Transparency level on display
-    self.transparencyBtn.DoClick = function()
-        self.IsTransparent = not self.IsTransparent
-        if self.IsTransparent then
-            self:SetVisible(true)
-            self:AlphaTo(initialTransparency, 0.2) -- Return to full visibility
-        else
-            self:AlphaTo(255, 0.2) -- Set transparency level
+--- Adds transparency toggle functionality to the frame.
+-- Creates a button that toggles between transparent (80% alpha) and opaque (100% alpha) states.
+-- In transparent mode, the cursor is hidden and can be shown with F3.
+-- Hotkey: ALT+H to toggle transparency from anywhere.
+-- @return (Panel): Returns self for method chaining.
+function FRAME:Transparency()
+    local initialTransparency = 80
+    DBase.CreateUIButton(self.top, {
+        background = false,
+        hover = false,
+        hoverClick = false,
+        wide = 30,
+        dock = { RIGHT },
+        tooltip = { 'Toggle transparency (ALT+H)', nil, nil, TOP },
+        icon = { 'K3QJsue', 24 },
+        click = function()
+            self:ToggleTransparency()
+        end
+    })
+    
+    -- Internal state tracking
+    local topInputEnabled = true
+    local top = self.top
+    local hookName = 'DanLib.TransparencyFrame.' .. self:GetName()
+    local hookShouldRun = false
+    
+    --- Sets mouse and keyboard input for top panel children.
+    -- @param enabled (boolean): Whether to enable or disable input.
+    local function SetTopChildrenInput(enabled)
+        for _, child in _pairs(top:GetChildren()) do
+            child:SetMouseInputEnabled(enabled)
+            child:SetKeyboardInputEnabled(enabled)
         end
     end
+    
+    --- Toggles transparency mode on/off.
+    -- Handles input state, popup status, and cursor visibility automatically.
+    function self:ToggleTransparency()
+        self.IsTransparent = not self.IsTransparent
+        
+        if self.IsTransparent then
+            -- === TRANSPARENT MODE ===
+            self:SetAlpha(255)
+            self:AlphaTo(initialTransparency, 0.2)
+            
+            -- Disable input for frame and children
+            self:SetKeyboardInputEnabled(false)
+            self:SetMouseInputEnabled(false)
+            
+            for _, child in _pairs(self:GetChildren()) do
+                child:SetKeyboardInputEnabled(false)
+                child:SetMouseInputEnabled(false)
+            end
+            
+            topInputEnabled = false
+            self._wasPopup = self.IsPopup
+            self.IsPopup = false
+            
+            -- Force hide cursor
+            _timerSimple(0.05, function()
+                if _IsValid(self) and self.IsTransparent then
+                    _guiEnableScreenClicker(false)
+                end
+            end)
+            
+            hookShouldRun = true
+            -- Think hook for smart cursor management
+            _hookAdd('Think', hookName, function()
+                if (not _IsValid(self) or not self.IsTransparent or not hookShouldRun) then
+                    _hookRemove('Think', hookName)
+                    return
+                end
+                
+                if _vguiCursorVisible() then
+                    -- Cursor visible - enable top panel and buttons
+                    if (not topInputEnabled) then
+                        top:SetMouseInputEnabled(true)
+                        top:SetKeyboardInputEnabled(true)
+                        SetTopChildrenInput(true)
+                        topInputEnabled = true
+                    end
+                else
+                    -- Cursor hidden - disable top panel
+                    if topInputEnabled then
+                        top:SetMouseInputEnabled(false)
+                        top:SetKeyboardInputEnabled(false)
+                        SetTopChildrenInput(false)
+                        topInputEnabled = false
+                    end
+                    _guiEnableScreenClicker(false)
+                end
+            end)
+                        
+        else
+            -- === OPAQUE MODE ===
+            self:AlphaTo(255, 0.2)
+            
+            hookShouldRun = false
+            _hookRemove('Think', hookName)
+            
+            top:SetMouseInputEnabled(true)
+            top:SetKeyboardInputEnabled(true)
+            SetTopChildrenInput(true)
+            
+            -- Re-enable all input
+            self:SetKeyboardInputEnabled(true)
+            self:SetMouseInputEnabled(true)
+            
+            for _, child in _pairs(self:GetChildren()) do
+                child:SetKeyboardInputEnabled(true)
+                child:SetMouseInputEnabled(true)
+            end
+            
+            topInputEnabled = true
+            
+            -- Restore popup status
+            if (self._wasPopup ~= false) then
+                self.IsPopup = true
+                self:MakePopup()
+            end
+        end
+    end
+    
+    -- ALT+H hotkey handler
+    local lastHotkeyState = false
+    local originalThink = self.Think
+    local KEY_LALT_CACHE = KEY_LALT
+    local KEY_RALT_CACHE = KEY_RALT
+    local KEY_H_CACHE = KEY_H
+    
+    self.Think = function(sl)
+        if originalThink then originalThink(sl) end
+        
+        if (sl.IsTransparent ~= nil) then
+            local altPressed = _inputIsKeyDown(KEY_LALT_CACHE) or _inputIsKeyDown(KEY_RALT_CACHE)
+            local hPressed = _inputIsKeyDown(KEY_H_CACHE)
+            local hotkeyPressed = altPressed and hPressed
+            
+            if (hotkeyPressed and not lastHotkeyState) then
+                sl:ToggleTransparency()
+            end
+            lastHotkeyState = hotkeyPressed
+        end
+    end
+    
+    -- Cleanup hook on frame removal
+    local originalOnRemove = self.OnRemove
+    self.OnRemove = function(pnl)
+        hookShouldRun = false
+        _hookRemove('Think', hookName)
+        if originalOnRemove then originalOnRemove(pnl) end
+    end
+    
+    self.IsTransparent = false
+    return self
 end
 
---- Includes the ability to resize by the user.
-function PANEL:EnableUserResize()
-    self.UserResize = customUtils.Create(self)
+--- Enables user-controlled resizing via a handle in the bottom-right corner.
+-- Displays current dimensions while resizing.
+-- Respects minimum width/height constraints.
+-- @return (Panel): Returns self for method chaining.
+function FRAME:EnableUserResize()
+    self.UserResize = DCustomUtils(self)
     self.UserResize:SetMouseInputEnabled(true)
     self.UserResize:SetCursor('sizenwse')
     self.UserResize:SetSize(18, 18)
     self.UserResize:MoveToFront()
-    function self.UserResize:OnMousePressed(m)
-        self.Dragging = true 
-        self.IsResizing = true
-    end
-
-    local the = self
-    function self.UserResize:Think()
-        if (self.Dragging == true) then
-            if input.IsMouseDown(MOUSE_LEFT) then
-                local x, y = gui.MousePos()
-                if (not self.StartingCoords) then self.StartingCoords = {x, y} end
-                if (not self.StartingSize) then self.StartingSize = { the:GetSize() } end
-
-                -- Get screen dimensions
-                local screenW, screenH = ScrW(), ScrH()
-                -- Calculate new dimensions
-                local newWidth = math.max(the:GetMinWidth() or 200, math.min(screenW, self.StartingSize[1] + (x - self.StartingCoords[1])))
-                local newHeight = math.max(the:GetMinHeight() or 200, math.min(screenH, self.StartingSize[2] + (y - self.StartingCoords[2])))
-                -- Set window dimensions
-                -- Check if the cursor is within screen bounds
-                if (x >= 0 and x <= screenW and y >= 0 and y <= screenH) then
-                    -- Set window dimensions only if within screen bounds
-                    the:SetSize(newWidth, newHeight)
+    
+    -- Localized variables for closure
+    local userResize = self.UserResize
+    local frame = self
+    
+    -- Draw resize icon
+    userResize:ApplyEvent(nil, function(sl, w, h)
+        local size = 16
+        local offset = (w - size) / 2
+        DUtils:DrawIcon(offset, offset, size, size, 'QAAyhNn', DBase:Theme('mat', 150))
+    end)
+    
+    userResize:ApplyEvent('OnMousePressed', function()
+        frame.DraggingWindow = true 
+        frame.IsResizing = true
+    end)
+    
+    userResize:ApplyEvent('Think', function()
+        if frame.DraggingWindow == true then
+            if _inputIsMouseDown(MOUSE_LEFT) then
+                local x, y = _guiMousePos()
+                
+                if (not frame.StartingCoords) then
+                    frame.StartingCoords = { x, y }
                 end
-                the:InvalidateChildren(true)
-            else
-                self.StartingCoords = nil
-                self.StartingSize = nil
-                self.Dragging = false
-                self.IsResizing = false
 
-                local function recursive(ren)
-                    for _, v in ipairs(ren) do
-                        if v.RerenderMarkups then v:RerenderMarkups() end
-                        recursive(v:GetChildren())
+                if (not frame.StartingSize) then
+                    frame.StartingSize = { frame:GetSize() }
+                end
+
+                local screenW, screenH = _ScrW(), _ScrH()
+                local minW = frame:GetMinWidth() or 200
+                local minH = frame:GetMinHeight() or 200
+                
+                -- Calculate new dimensions with constraints
+                local newWidth = _mathClamp(frame.StartingSize[1] + (x - frame.StartingCoords[1]), minW, screenW)
+                local newHeight = _mathClamp(frame.StartingSize[2] + (y - frame.StartingCoords[2]), minH, screenH)
+                
+                if (x >= 0 and x <= screenW and y >= 0 and y <= screenH) then
+                    frame:SetSize(newWidth, newHeight)
+                end
+                frame:InvalidateChildren(true)
+            else
+                frame.StartingCoords = nil
+                frame.StartingSize = nil
+                frame.DraggingWindow = false
+                frame.IsResizing = false
+
+                -- Recursively rerender markup children
+                local function rerenderChildren(children)
+                    for i = 1, #children do
+                        local child = children[i]
+                        if child.RerenderMarkups then
+                            child:RerenderMarkups()
+                        end
+                        rerenderChildren(child:GetChildren())
                     end
                 end
-                recursive(the:GetChildren())
+                rerenderChildren(frame:GetChildren())
             end
         end
-    end
-
-    -- Drawing the resize icon
-    self.UserResize:ApplyEvent(nil, function(sl, w, h)
-        local size = 16
-        utils:DrawIcon(w / 2 - size / 2, h / 2 - size / 2, size, size, 'QAAyhNn', base:Theme('mat'))
     end)
+    
+    return self
 end
 
+--- Draws overlay showing current dimensions while resizing.
+-- @param w (number): Frame width in pixels.
+-- @param h (number): Frame height in pixels.
 local font = 'danlib_font_18'
-local color = base:Theme('decor')
-function PANEL:PaintOver(w, h)
-    if self.IsResizing then
-        utils:DrawRect(0, 0, w, h, Color(10, 10, 10, 240))
+local color = DBase:Theme('decor')
 
-        draw.SimpleText('Editing the size ', font, w / 2, h / 2, color, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
-        draw.SimpleText(string.format('(%dpx x %dpx)', w, h), font, w / 2, h / 2, color, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
-        draw.SimpleText(w .. 'px', font, w / 2, h - 15, color, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
-        draw.SimpleText(h .. 'px', font, w - 15, h / 2, color, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
-        draw.SimpleText(w .. 'px', font, w / 2, 15, color, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
-        draw.SimpleText(h .. 'px', font, 15, h / 2, color, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+function FRAME:PaintOver(w, h)
+    if self.IsResizing then
+        DUtils:DrawRoundedBox(0, 0, w, h, Color(10, 10, 10, 240))
+        local sizeText = _stringFormat('(%dpx x %dpx)', w, h)
+        _drawSimpleText('Editing the size ', font, w / 2, h / 2, color, _TEXT_ALIGN_CENTER, _TEXT_ALIGN_BOTTOM)
+        _drawSimpleText(sizeText, font, w / 2, h / 2, color, _TEXT_ALIGN_CENTER, _TEXT_ALIGN_TOP)
+        _drawSimpleText(w .. 'px', font, w / 2, h - 15, color, _TEXT_ALIGN_CENTER, _TEXT_ALIGN_BOTTOM)
+        _drawSimpleText(h .. 'px', font, w - 15, h / 2, color, _TEXT_ALIGN_RIGHT, _TEXT_ALIGN_CENTER)
+        _drawSimpleText(w .. 'px', font, w / 2, 15, color, _TEXT_ALIGN_CENTER, _TEXT_ALIGN_TOP)
+        _drawSimpleText(h .. 'px', font, 15, h / 2, color, _TEXT_ALIGN_LEFT, _TEXT_ALIGN_CENTER)
     end
 end
 
---- Sets the icon for the frame.
--- @param str (string): Path to the icon.
-function PANEL:SetIcon(str)
+--- Sets the frame icon (currently unused).
+-- @param str (string): Path to icon file.
+function FRAME:SetIcon(str)
     self.imgIcon = str
 end
 
---- Sets the minimum dimensions for resizing the frame.
--- @param width (number): Minimum width.
--- @param height (number): Minimum height.
-function PANEL:SetMinWMinH(width, height)
+--- Sets minimum dimensions for frame resizing.
+-- @param width (number): Minimum width in pixels.
+-- @param height (number): Minimum height in pixels.
+function FRAME:SetMinWMinH(width, height)
     self:SetMinWidth(width)
     self:SetMinHeight(height)
 end
 
---- Performs the layout of frame elements.
--- @param w (number): The width of the frame.
--- @param h (number): The height of the frame.
-function PANEL:PerformLayout(w, h)
-    -- self.top:SetWide(self:GetWide())
-    for _, child in pairs(self:GetChildren()) do child:InvalidateLayout(true) end
-    if IsValid(self.UserResize) then self.UserResize:AlignRight(0) self.UserResize:AlignBottom(0) end
-    if self.PostPerformLayout then self:PostPerformLayout() end
+--- Performs layout of frame elements.
+-- Called automatically when frame size changes.
+-- @param w (number): Frame width in pixels.
+-- @param h (number): Frame height in pixels.
+function FRAME:PerformLayout(w, h)
+    for _, child in _pairs(self:GetChildren()) do
+        child:InvalidateLayout(true)
+    end
+
+    if _IsValid(self.UserResize) then
+        self.UserResize:AlignRight(0)
+        self.UserResize:AlignBottom(0)
+    end
+
+    if self.PostPerformLayout then
+        self:PostPerformLayout()
+    end
 end
 
---- Sets the title of the frame.
--- @param str (string): Header.
-function PANEL:SetTitle(str)
+--- Sets the frame title text.
+-- @param str (string): Title text to display.
+function FRAME:SetTitle(str)
     self.title:SetText(str or '')
     self.title:SizeToContents()
 end
 
---- Draws the frame.
--- @param w (number): Frame width.
--- @param h (number): The height of the frame.
-function PANEL:Paint(w, h)
+--- Draws the frame background with optional shadow.
+-- @param w (number): Frame width in pixels.
+-- @param h (number): Frame height in pixels.
+function FRAME:Paint(w, h)
     if (not self.disableShadows) then
         DanLib.DrawShadow:Begin()
         local x, y = self:LocalToScreen(0, 0)
-        utils:DrawRoundedBox(x, y, w, h, self.Background or base:Theme('background'))
+        DUtils:DrawRoundedBox(x, y, w, h, self.Background or DBase:Theme('background'))
         DanLib.DrawShadow:End(1, 1, 1, 255, 0, 0, false)
     else
-        utils:DrawRoundedBox(0, 0, w, h, base:Theme('background'))
+        DUtils:DrawRoundedBox(0, 0, w, h, DBase:Theme('background'))
     end
 end
 
 --- Shows or hides the close button.
--- @param show (boolean): Whether to show the button.
-function PANEL:ShowCloseButton(show)
+-- @param show (boolean): True to show, false to hide.
+function FRAME:ShowCloseButton(show)
     self.closeBtn:SetVisible(show)
 end
 
---- Sets the frame background.
--- @param background (Color): The colour of the background.
-function PANEL:SetBackground(background)
+--- Sets custom background color for the frame.
+-- @param background (Color): Background color.
+function FRAME:SetBackground(background)
     self.Background = background
 end
 
---- Disables or enables shadows.
--- @param disable (boolean): Whether to disable shadows.
-function PANEL:DisableShadows(disable)
+--- Enables or disables shadow drawing for the frame.
+-- @param disable (boolean): True to disable shadows, false to enable.
+function FRAME:DisableShadows(disable)
     self.disableShadows = disable
 end
 
-PANEL:SetBase('DFrame')
-PANEL:Register('DanLib.UI.Frame')
+FRAME:SetBase('DFrame')
+FRAME:Register('DanLib.UI.Frame')
 
 
-
---- Creates a new frame with the specified parent.
--- @param parent (Panel): Parent element, defaults to nil.
--- @return (DFrame): New frame created.
-function base.CreateUIFrame(parent)
-    parent = parent or nil
-
-    local DFrame = customUtils.Create(parent, 'DanLib.UI.Frame')
-    return DFrame
+--- Creates a new DanLib UI frame.
+-- @param parent (Panel|nil): Parent panel, or nil for no parent.
+-- @return (Panel): New DanLib.UI.Frame instance.
+-- @usage
+--   local frame = DBase.CreateUIFrame()
+--   frame:SetSize(400, 300)
+--   frame:SetTitle('My Frame')
+--   frame:Center()
+--   frame:MakePopup()
+--   frame:Transparency() -- Enable transparency toggle
+--   frame:EnableUserResize() -- Enable resizing
+function DBase.CreateUIFrame(parent)
+    return DCustomUtils(parent or nil, 'DanLib.UI.Frame')
 end
 
 
 
 
-
-
-
-
-
-
-
-local ui = DanLib.UI
-local BASIS, _ = DanLib.UiPanel()
-
+local BASIS = DanLib.UiPanel()
+--- Initializes the popup basis with default settings.
+-- Creates fullscreen background with blur, centered main panel, header, and close button.
+-- Automatically animates panel appearance with fade and size animations.
 function BASIS:Init()
-    self:SetSize(ScrW(), ScrH())
+    -- Fullscreen background setup
+    self:SetSize(_ScrW(), _ScrH())
     self:MakePopup()
     self:SetTitle('')
     self:SetDraggable(false)
@@ -321,159 +562,245 @@ function BASIS:Init()
     self:AlphaTo(255, 0.1)
     self:SetDrawHeader(true)
 
-    self.backButton = base:CreateButton(self)
-    self.backButton:Pin()
-    self.backButton:SetBackgroundColor(Color(0, 0, 0, 0))
-    self.backButton:SetHoverTum(true)
+    -- Localization for closure
+    local scrW = _ScrW()
+    local scrH = _ScrH()
+    
+    -- Invisible background button for closing on click
+    self.backButton = DBase.CreateUIButton(self, {
+        background = false,
+        hover = false,
+        hoverClick = false,
+        wide = 30,
+        dock = { FILL },
+        click = function()
+            self:Close()
+        end
+    })
     self.backButton:SetCursor('arrow')
-    self.backButton.DoClick = function()
-        self:Close()
-    end
 
-    self.mainPanel = customUtils.Create(self)
-    self.mainPanel:SetSize(ScrW() * 0.15, 0)
+    -- Main centered panel
+    self.mainPanel = DCustomUtils(self)
+    self.mainPanel:SetSize(scrW * 0.15, 0)
     self.mainPanel:Center()
-    -- self.mainPanel:ApplyShadow(10, true)
-    self.mainPanel.Paint = function(sl, w, h)
+    local mainPanel = self.mainPanel
+    mainPanel:ApplyEvent(nil, function(sl, w, h)
         if (not sl.disableShadows) then
             local x, y = sl:LocalToScreen(0, 0)
             DanLib.DrawShadow:Begin()
-            utils:DrawRoundedBox(x, y, w, h, base:Theme('background'))
+            DUtils:DrawRoundedBox(x, y, w, h, DBase:Theme('background'))
             DanLib.DrawShadow:End(1, 1, 1)
         else
-            utils:DrawRoundedBox(0, 0, w, h, base:Theme('background'))
+            DUtils:DrawRoundedBox(0, 0, w, h, DBase:Theme('background'))
         end
-    end
-
-    self.mainPanel.OnSizeChanged = function(sl)
+    end)
+    
+    mainPanel:ApplyEvent('OnSizeChanged', function(sl)
         sl:Center()
-    end
+    end)
 
-    self.top = customUtils.Create(self.mainPanel)
+    -- Header panel
+    self.top = DCustomUtils(mainPanel)
     self.top:Pin(TOP)
     self.top:SetTall(30)
     self.top:DockPadding(0, 0, 0, 2)
     self.top.size = 16
-    self.top.Paint = function(sl, w, h)
-        if (not self.headerShouldDraw) then return end
+    
+    local top = self.top
+    top:ApplyEvent(nil, function(sl, w, h)
+        if (not self.headerShouldDraw) then
+            return
+        end
         
-        utils:DrawRoundedTopBox(0, 0, w, h, base:Theme('line_up'))
-        draw.SimpleText(self.headerText or '', 'danlib_font_20', self.strIcon and 34 or 10, h / 2 - 1, base:Theme('text'), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        DUtils:DrawRoundedTopBox(0, 0, w, h, DBase:Theme('line_up'))
+        
+        local textX = self.strIcon and 34 or 10
+        _drawSimpleText(self.headerText or '', 'danlib_font_18', textX, h / 2 - 1, DBase:Theme('text'), _TEXT_ALIGN_LEFT, _TEXT_ALIGN_CENTER)
 
         if self.strIcon then
-            utils:DrawIconOrMaterial(10, h / 2 - sl.size / 2, sl.size, self.strIcon, self.strIconCol)
+            DUtils:DrawIconOrMaterial(10, h / 2 - sl.size / 2, sl.size, self.strIcon, self.strIconCol)
         end
-    end
+    end)
 
-    self.closeBtn = base:CreateButton(self.top)
-    self.closeBtn:Pin(RIGHT, 2)
-    self.closeBtn:SetWide(30)
-    self.closeBtn:ApplyTooltip(base:L('#close'), nil, nil, TOP)
-    self.closeBtn:icon('jWj7VqX', 18)
-    self.closeBtn:SetHoverTum(true)
-    self.closeBtn:SetBackgroundColor(Color(0, 0, 0, 0))
-    self.closeBtn.DoClick = function()
-        self:Close()
-    end
+    -- Close button
+    self.closeBtn = DBase.CreateUIButton(top, {
+        background = false,
+        hover = false,
+        hoverClick = false,
+        wide = 30,
+        dock = { RIGHT },
+        tooltip = { DBase:L('#close'), nil, nil, TOP },
+        icon = { 'jWj7VqX', 24 },
+        click = function()
+            self:Close()
+        end
+    })
 
-    -- Creating a settings button
-    self.settingsBtn = base:CreateButton(self.top)
-    self.settingsBtn:Pin(RIGHT)
-    self.settingsBtn:SetWide(30)
-    self.settingsBtn:SetHoverTum(true)
-    self.settingsBtn:SetBackgroundColor(Color(0, 0, 0, 0))
-    self.settingsBtn:SetVisible(false)
-
+    -- Internal state
     self.initFinished = true
-    self.mainPanel.targetH = self.top:GetTall()
-    self.mainPanel:SetTall(self.mainPanel.targetH)
-
-    self.startTime = SysTime()
+    mainPanel.targetH = top:GetTall()
+    mainPanel:SetTall(mainPanel.targetH)
+    self.startTime = _SysTime()
 end
 
+--- Closes the popup with fade and size animations.
+-- Calls OnClose callback if defined, then removes the panel.
 function BASIS:Close()
     self.FullyOpened = false
-
     if self.OnClose then
         self:OnClose()
     end
-
     self:AlphaTo(0, 0.2)
     self.mainPanel:SizeTo(self.mainPanel:GetWide(), 0, 0.2, 0, -1, function()
         self:Remove()
     end)
 end
 
+--- Enables or disables shadow rendering for the main panel.
+-- @param disable (boolean): True to disable shadows, false to enable.
+-- @return (Panel): Returns self for method chaining.
 function BASIS:DisableShadows(disable)
     self.disableShadows = disable
+    return self
 end
 
+--- Sets the header text displayed in the top panel.
+-- @param header (string): Header text to display.
+-- @return (Panel): Returns self for method chaining.
 function BASIS:SetHeader(header)
     self.headerText = header
+    return self
 end
 
+--- Controls whether the header is drawn.
+-- @param shouldDraw (boolean): True to show header, false to hide.
+-- @return (Panel): Returns self for method chaining.
 function BASIS:SetDrawHeader(shouldDraw)
     self.headerShouldDraw = shouldDraw
+    return self
 end
 
+--- Sets the width of the main panel.
+-- @param width (number): Panel width in pixels.
+-- @return (Panel): Returns self for method chaining.
 function BASIS:SetPopupWide(width)
     self.mainPanel:SetWide(width)
+    return self
 end
 
+--- Gets the current width of the main panel.
+-- @return (number): Panel width in pixels.
 function BASIS:GetPopupWide()
     return self.mainPanel:GetWide()
 end
 
-function BASIS:icon(i, c)
-    self.strIcon = i
-    self.strIconCol = c
+--- Sets the icon displayed in the header.
+-- @param iconID (string): Icon identifier or material path.
+-- @param color (Color|nil): Icon color (optional).
+-- @return (Panel): Returns self for method chaining.
+function BASIS:SetIcon(iconID, color)
+    self.strIcon = iconID
+    self.strIconCol = color
+    return self
 end
 
+--- Gets the target height of the main panel (including header).
+-- @return (number): Panel height in pixels.
 function BASIS:GetPopupTall()
     return self.mainPanel.targetH
 end
 
+--- Shows or hides the close button in the header.
+-- @param show (boolean): True to show, false to hide.
+-- @return (Panel): Returns self for method chaining.
 function BASIS:CloseButtonShow(show)
     self.closeBtn:SetVisible(show)
+    return self
 end
 
---- Sets the function for the settings button.
--- @param show (boolean): Whether to show the button.
--- @param func (function): Function to execute when pressed.
-function BASIS:SetSettingsFunc(show, text, icon, func)
-    self.settingsBtn:SetVisible(show)
-    self.settingsBtn:icon(icon or 'lgHTnoN', 18)
-    self.settingsBtn:ApplyTooltip(text or nil, nil, nil, TOP)
-    self.settingsBtn.DoClick = func or function() end
+--- Adds a settings button to the popup's top panel.
+-- @param text (string|nil): Tooltip text (default: localized '#settings').
+-- @param icon (string|nil): Icon identifier (default: 'lgHTnoN').
+-- @param func (function): Callback function when clicked.
+-- @return (Panel): Returns self for method chaining.
+function BASIS:SetSettingsFunc(text, icon, func)
+    DBase.CreateUIButton(self.top, {
+        background = false,
+        hover = false,
+        hoverClick = false,
+        wide = 30,
+        dock = { RIGHT },
+        tooltip = { text or DBase:L('#settings'), nil, nil, TOP },
+        icon = { icon or 'lgHTnoN', 24 },
+        click = func or function() end
+    })
+    return self
 end
 
+--- Shows or hides the background close button (clicking outside to close).
+-- @param show (boolean): True to enable background closing, false to disable.
+-- @return (Panel): Returns self for method chaining.
 function BASIS:BackgroundCloseButtonShow(show)
     self.backButton:SetVisible(show)
+    return self
 end
 
+--- Sets the content height and animates the panel to target size.
+-- Calls OnOpen callback when animation completes.
+-- @param extraH (number): Content height in pixels (excluding header).
+-- @return (Panel): Returns self for method chaining.
 function BASIS:SetExtraHeight(extraH)
-    self.mainPanel.targetH = self.top:GetTall() + extraH
-    self.mainPanel:SizeTo(self.mainPanel:GetWide(), self.mainPanel.targetH, 0.3, 0, -1, function()
+    local mainPanel = self.mainPanel
+    mainPanel.targetH = self.top:GetTall() + extraH
+    
+    mainPanel:SizeTo(mainPanel:GetWide(), mainPanel.targetH, 0.3, 0, -1, function()
         self.FullyOpened = true
-
-        if (self.OnOpen) then
+        if self.OnOpen then
             self:OnOpen()
         end
     end)
+    
+    return self
 end
 
+--- Automatically parents newly added panels to mainPanel instead of background.
+-- @param panel (Panel): Child panel being added.
 function BASIS:OnChildAdded(panel)
     if (not self.initFinished) then
         return
     end
-
     panel:SetParent(self.mainPanel)
 end
 
+--- Draws the background blur effect.
+-- @param w (number): Panel width in pixels.
+-- @param h (number): Panel height in pixels.
 function BASIS:Paint(w, h)
     Derma_DrawBackgroundBlur(self, self.startTime)
 end
 
-
 BASIS:SetBase('DFrame')
 BASIS:Register('DanLib.UI.PopupBasis')
+
+--- Creates a new DanLib popup basis panel.
+-- Centered popup with blur background, header, and smooth animations.
+-- @param parent (Panel|nil): Parent panel, or nil for no parent.
+-- @return (Panel): New DanLib.UI.PopupBasis instance.
+-- @usage
+--   local popup = DBase.CreateUIPopupBasis()
+--   popup:SetPopupWide(500)
+--   popup:SetHeader('Settings')
+--   popup:SetIcon('lgHTnoN', Color(255, 255, 255))
+--   popup:SetExtraHeight(400)
+--   popup:CloseButtonShow(true)
+--   popup:BackgroundCloseButtonShow(true)
+--   popup:SetSettingsFunc('Options', 'lgHTnoN', function()
+--       print('Settings clicked')
+--   end)
+--   
+--   -- Add content
+--   local label = DBase:CreateLabel(popup, 'Content', 'DermaDefault')
+--   label:Dock(TOP)
+function DBase.CreateUIPopupBasis(parent)
+    return DCustomUtils(parent or nil, 'DanLib.UI.PopupBasis')
+end
