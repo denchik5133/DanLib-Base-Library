@@ -430,7 +430,7 @@ function DBase.CreateUICheckbox(parent, options)
     
     -- TEXT - WITH DYNAMIC TEXT SUPPORT
     if hasKey('text') then
-        local text = normalizeOption(options.text)
+        local text = _normalizeOption(options.text)
         
         -- [1] = , text OR {enabledText, disabledText}
         if text[1] then
