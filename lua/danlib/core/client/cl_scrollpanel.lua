@@ -1489,17 +1489,21 @@ function HORIZONTALSCROLL:PerformLayout(w, h)
     
     self.canvas:SizeToChildren(true, false)
     
-    -- Proper nil check (0 is a valid value!)
     local scrollBarHeight = 8
     local scrollBarMargin = self:GetBarMargin()
-    if (scrollBarMargin == nil) then
-        scrollBarMargin = 0 -- fallback only if nil, not if 0!
+    
+    -- Apply bottom padding only if BarMargin is set and > 0
+    if (scrollBarMargin and scrollBarMargin > 0) then
+        self.canvas:DockPadding(0, 0, 0, scrollBarMargin)
+    else
+        self.canvas:DockPadding(0, 0, 0, 0)
     end
     
-    self.canvas:SetSize(self.canvas:GetWide(), h - scrollBarHeight - scrollBarMargin)
+    self.canvas:SetSize(self.canvas:GetWide(), h)
     if (not _IsValid(self.scrollBar)) then
         return
     end
+    
     self.scrollBar:SetWide(w)
     self.scrollBar:SetPos(0, h - scrollBarHeight)
     self:CheckShouldEnable()
