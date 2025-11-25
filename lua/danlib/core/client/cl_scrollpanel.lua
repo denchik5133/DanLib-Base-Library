@@ -581,7 +581,7 @@ SCROLLBAR:Register('DanLib.UI.ScrollBar')
 local DEFAULT_SCROLLBAR_WIDTH = 10
 local DEFAULT_PADDING = 0
 local SCROLLBAR_WIDTH_SCALE = 0.75
-local SCROLL_ANIMATION_DURATION = 0.5
+local SCROLL_ANIMATION_DURATION = 2
 
 -- Constants for navigation buttons
 local NAV_BUTTON_SIZE = 32
