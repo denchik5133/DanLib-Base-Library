@@ -90,7 +90,7 @@ SCROLLBAR:Accessor('HideButtons', Constructor.Boolean, { default = false })
 SCROLLBAR:Accessor('BarColor', Constructor.Color, { default = nil })
 SCROLLBAR:Accessor('BarHoverColor', Constructor.Color, { default = nil })
 SCROLLBAR:Accessor('ClickAnimationDuration', Constructor.Number, { default = 0.4 })
-SCROLLBAR:Accessor('WheelSmoothSpeed', Constructor.Number, { default = 10 })
+SCROLLBAR:Accessor('WheelSmoothSpeed', Constructor.Number, { default = 6 })
 SCROLLBAR:Accessor('WheelScrollSpeed', Constructor.Number, { 
     default = 3,
     validate = function(self, val)
@@ -1145,7 +1145,7 @@ HORIZONTALSCROLL:Accessor('WheelScrollSpeed', Constructor.Number, {
         return val > 0 and val <= 200
     end
 })
-HORIZONTALSCROLL:Accessor('WheelSmoothSpeed', Constructor.Number, { default = 10 })
+HORIZONTALSCROLL:Accessor('WheelSmoothSpeed', Constructor.Number, { default = 6 })
 
 --- Initializes the horizontal scroll panel component
 -- Sets up canvas, scrollbar, and grip with event handlers for dragging and clicking
