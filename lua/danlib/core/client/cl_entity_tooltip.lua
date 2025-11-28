@@ -522,7 +522,7 @@ local function _renderTooltip(candidate)
     local textStartX = x + RENDER_CONSTANTS.PADDING_X
     if (iconSize > 0) then
         local iconY = y + (panelH * 0.5) - (iconSize * 0.5)
-        DUtils:DrawIcon(x + RENDER_CONSTANTS.PADDING_X, iconY, iconSize, iconSize, renderData.icon, _ColorAlpha(renderData.color, alpha))
+        DUtils:DrawIconOrMaterial(x + RENDER_CONSTANTS.PADDING_X, iconY, iconSize, renderData.icon, _ColorAlpha(renderData.color, alpha))
         textStartX = x + iconPadding + RENDER_CONSTANTS.PADDING_X
     end
     
@@ -639,3 +639,4 @@ function DTooltips:SetConfig(key, value)
         CONFIG[key] = value
     end
 end
+
