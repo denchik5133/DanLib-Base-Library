@@ -24,6 +24,8 @@ function ENT:Initialize()
     self.NPCConfig = nil
     self.LastNPCKey = ''
     self.AnimationSet = false
+
+    self.TooltipSet = false
 end
 
 --- Updating the object's status.
@@ -42,6 +44,17 @@ function ENT:Think()
                 self:ResetSequence(anim)
                 self.AnimationSet = true
             end
+        end
+        
+        if (self.NPCConfig and not self.TooltipSet) then
+            local npcName = self.NPCConfig.Name or 'Unknown NPC'
+            self:SetEntityTooltip({
+                title = npcName,
+                icon = 'BGCpqAF',
+                distance = 250,
+            })
+            
+            self.TooltipSet = true
         end
     end
     
@@ -64,7 +77,6 @@ function ENT:Think()
             end
             return
         end 
-
         local pPos = pPlayer:EyePos()
         local ang = (pPos - self:EyePos()):Angle()
         local yaw = _mathNormalizeAngle(ang.y - self:GetAngles().y)
@@ -89,4 +101,5 @@ function ENT:OnNPCKeyVarChanged(varname, oldval, newval)
     self.AnimationSet = false
     self.LastNPCKey = ''
     self.NPCConfig = nil
+    self.TooltipSet = false
 end
