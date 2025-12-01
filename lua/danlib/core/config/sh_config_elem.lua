@@ -191,12 +191,12 @@ FORMAT_DAMAGE    = 14
 -- Permissions
 DanLib.BaseConfig.RanksMax = 15
 DanLib.BaseConfig.Permissions = DanLib.BaseConfig.Permissions or {}
-DanLib.BaseConfig.Permissions['EditSettings'] = 'Permission to edit the configuration.'
-DanLib.BaseConfig.Permissions['EditRanks'] = 'Permission to edit ranks.'
-DanLib.BaseConfig.Permissions['AdminPages'] = 'Permission to view pages for administrators.'
-DanLib.BaseConfig.Permissions['ViewHelp'] = 'Permissions to view the page and other help items.'
-DanLib.BaseConfig.Permissions['Tutorial'] = 'Permission to view the textbook.'
-DanLib.BaseConfig.Permissions['SpawnNPC'] = 'Permission to spawn NPCs.'
+-- DanLib.BaseConfig.Permissions['EditSettings'] = 'Permission to edit the configuration.'
+-- DanLib.BaseConfig.Permissions['EditRanks'] = 'Permission to edit ranks.'
+-- DanLib.BaseConfig.Permissions['AdminPages'] = 'Permission to view pages for administrators.'
+-- DanLib.BaseConfig.Permissions['ViewHelp'] = 'Permissions to view the page and other help items.'
+-- DanLib.BaseConfig.Permissions['Tutorial'] = 'Permission to view the textbook.'
+-- DanLib.BaseConfig.Permissions['SpawnNPC'] = 'Permission to spawn NPCs.'
 
 
 -- Initialising the key binding menu
