@@ -1,229 +1,303 @@
 /***
  *   @addon         DanLib
- *   @version       3.0.0
- *   @release_date  10/4/2023
+ *   @version       2.4.0
+ *   @release_date  01/12/2024
  *   @author        denchik
  *   @contact       Discord: denchik_gm
  *                  Steam: https://steamcommunity.com/profiles/76561198405398290/
  *                  GitHub: https://github.com/denchik5133
  *                
- *   @description   Universal library for GMod Lua, combining all the necessary features to simplify script development. 
- *                  Avoid code duplication and speed up the creation process with this powerful and convenient library.
+ *   @description   Rank management system with caching, permissions, and security
  *
- *   @usage         !danlibmenu (chat) | danlibmenu (console)
+ *   @changelog     2.4.0
+ *                  - Added automatic cache cleanup to prevent memory leaks
+ *                  - Refactored rank data retrieval with helper function
+ *                  - Moved permission checks to server-side for security
+ *                  - Optimized GetRankStatistics with cached data
+ *                  - Added comprehensive input validation
+ *                  - Improved error handling and logging
+ *                  - Centralized rank data access patterns
+ *
  *   @license       MIT License
- *   @notes         For feature requests or contributions, please open an issue on GitHub.
  */
  
 
 
-local base = DanLib.Func
-local Table = DanLib.Table
-local metaPlayer = DanLib.MetaPlayer
-local network = DanLib.Network
+local DBase = DanLib.Func
+local DTable = DanLib.Table
+local METAPLAYER = DanLib.MetaPlayer
+local DNetwork = DanLib.Network
 
+local _IsValid = IsValid
+local _pairs = pairs
+local _ipairs = ipairs
+local _CurTime = CurTime
+local _stringFind = string.find
+local _stringLower = string.lower
+local _stringSplit = string.Split
+local _playerGetAll = player.GetAll
 
--- Get current rank for a player
-function metaPlayer:get_danlib_rank()
-    return self:GetNWString('DanLib.RankID', 'rank_member')
+-- CONSTANTS
+local CACHE_DURATION = 5 -- Rank cache time (seconds)
+local CACHE_CLEANUP_INTERVAL = 30 -- Cache cleanup interval (seconds)
+local DEFAULT_RANK = 'rank_member'
+local OWNER_RANK = 'rank_owner'
+
+DanLib.RankCache = DanLib.RankCache or {}
+DanLib.NextCacheClean = DanLib.NextCacheClean or 0
+
+--- Retrieves rank data from the configuration
+-- @param rankID (string): Rank ID
+-- @param field (string|nil): Field to receive (nil = all data)
+-- @param default (any): Default value
+-- @return any: Rank data or default value
+local function GetRankData(rankID, field, default)
+    if (not rankID or rankID == '') then
+        return default
+    end
+    
+    local ranks = DanLib.ConfigMeta.BASE:GetValue('Ranks') or {}
+    local rankData = ranks[rankID]
+    
+    if (not rankData) then
+        return default
+    end
+    
+    if field then
+        return rankData[field] ~= nil and rankData[field] or default
+    end
+    
+    return rankData
 end
 
-
--- Function to get the player's rank name
-function metaPlayer:get_danlib_rank_name()
-    -- Get the player's rank identifier
-    local rankID = self:get_danlib_rank()
+--- Periodic cleaning of outdated cache entries
+local function CleanRankCache()
+    local currentTime = _CurTime()
+    if (DanLib.NextCacheClean > currentTime) then
+        return
+    end
     
-    -- Getting rank data from the configuration
-    local ranks = DanLib.ConfigMeta.BASE:GetValue('Ranks') or {}
+    DanLib.NextCacheClean = currentTime + CACHE_CLEANUP_INTERVAL
     
-    -- Check if this rank ID exists in the configuration
-    if ranks[rankID] then
-        return ranks[rankID].Name -- Return the rank name
-    else
-        return 'Member' -- Return the default "Member" if no rank is found
+    local cleaned = 0
+    for steamID, data in _pairs(DanLib.RankCache) do
+        if (data.time < currentTime - CACHE_DURATION * 2) then
+            DanLib.RankCache[steamID] = nil
+            cleaned = cleaned + 1
+        end
+    end
+    
+    if (cleaned > 0) then
+        -- print('[DanLib] Cleaned ' .. cleaned .. ' expired rank cache entries')
     end
 end
 
+-- Automatic cache clearing
+hook.Add('Think', 'DanLib.CleanRankCache', CleanRankCache)
 
--- Function to get the player's rank color
-function metaPlayer:get_danlib_rank_color()
-    -- Get the player's rank identifier
-    local rankID = self:get_danlib_rank()
-    
-    -- Getting rank data from the configuration
-    local ranks = DanLib.ConfigMeta.BASE:GetValue('Ranks') or {}
-    
-    -- Check if this rank ID exists in the configuration
-    if ranks[rankID] then
-        return ranks[rankID].Color or Color(0, 151, 230, 255) -- Return the rank color or default to white
-    else
-        return Color(0, 151, 230, 255) -- Return default color (white) if no rank is found
+--- Gets the player's rank ID
+-- @return string: Rank ID
+function METAPLAYER:get_danlib_rank()
+    if (not _IsValid(self)) then
+        return DEFAULT_RANK
     end
+    
+    return self:GetNWString('DanLib.RankID', DEFAULT_RANK)
 end
 
-
---- Gets a list of permissions for the current player rank.
--- @return: Table with permissions for the player's rank.
-function metaPlayer:get_danlib_rank_permissions()
-    -- Get the player's rank identifier
-    local rankID = self:get_danlib_rank()
+--- Gets the rank ID with caching
+-- @return string: Rank ID
+function METAPLAYER:get_danlib_rank_cached()
+    if (not _IsValid(self)) then
+        return DEFAULT_RANK
+    end
     
-    -- Getting rank data from the configuration
-    local ranks = DanLib.ConfigMeta.BASE:GetValue('Ranks') or {}
+    local steamID = self:SteamID64()
+    local currentTime = _CurTime()
+    
+    -- Checking the cache
+    local cached = DanLib.RankCache[steamID]
+    if (cached and cached.time > currentTime - CACHE_DURATION) then
+        return cached.rank
+    end
+    
+    -- Updating the cache
+    local rank = self:get_danlib_rank()
+    DanLib.RankCache[steamID] = {
+        rank = rank,
+        time = currentTime
+    }
+    
+    return rank
+end
 
-    -- Check if the player has the rank 'rank_owner'
-    if (rankID == 'rank_owner') then
-        -- If it's the owner, return all permissions
-        -- Return the special key to indicate that the owner has all permissions
+--- Gets the name of the player's rank
+-- @return string: Rank name
+function METAPLAYER:get_danlib_rank_name()
+    if (not _IsValid(self)) then
+        return 'Member'
+    end
+    
+    local rankID = self:get_danlib_rank_cached()
+    return GetRankData(rankID, 'Name', 'Member')
+end
+
+--- Gets the color of the player's rank
+-- @return Color: Rank color
+function METAPLAYER:get_danlib_rank_color()
+    if (not _IsValid(self)) then
+        return Color(0, 151, 230)
+    end
+    
+    local rankID = self:get_danlib_rank_cached()
+    return GetRankData(rankID, 'Color', Color(0, 151, 230))
+end
+
+--- Gets player rank access rights
+-- @return table: Table with access rights
+function METAPLAYER:get_danlib_rank_permissions()
+    if (not _IsValid(self)) then
+        return {}
+    end
+    
+    local rankID = self:get_danlib_rank_cached()
+    
+    -- The owner has all the rights
+    if (rankID == OWNER_RANK) then
         return { all_access = true }
     end
     
-    -- Check if there is a rank
-    if ranks[rankID] then
-        local permissions = ranks[rankID].Permission or {}
-        return permissions -- Return permissions for rank
-    else
-        return {} -- Return empty table if no rank is found
-    end
+    return GetRankData(rankID, 'Permission', {})
 end
 
-
---- Checks if a player has a specific permission based on their rank.
--- @param pPlayer: The player to check.
--- @param permission: The permission to check for.
--- @return: true if the player has permission, false otherwise.
-function base.HasPermission(pPlayer, permission)
-    -- Get player's rank identifier
-    local rankID = pPlayer:get_danlib_rank()
-    if (not rankID) then
-        print('Rank identifier not found')
+--- Checks if the player has a license.
+-- @param pPlayer (Player): Player
+-- @param permission (string): Title of the right
+-- @return boolean: true if there is a right
+function DBase.HasPermission(pPlayer, permission)
+    -- Validation of input data
+    if (not _IsValid(pPlayer) or not pPlayer:IsPlayer()) then
         return false
     end
-
-    -- Check if the player is the owner
-    if (rankID == 'rank_owner') then
-        return true -- Owners have access to all permits at all times
-    end
-
-    -- Get rank data
-    local ranks = DanLib.ConfigMeta.BASE:GetValue('Ranks') or {}
-    local playerRank = ranks[rankID]
-
-    -- Check if the rank exists and if it has permissions
-    if (not playerRank) then
-        print('Rank not found')
+    
+    if (not permission or permission == '') then
         return false
     end
-
-    -- Check if the requested permission exists
-    if (DanLib.BaseConfig.Permissions[permission] == nil) then
-        print('Permission not found, access denied')
+    
+    -- Getting the rank ID
+    local rankID = pPlayer:get_danlib_rank_cached()
+    
+    -- The owner has all the rights
+    if (rankID == OWNER_RANK) then
+        return true
+    end
+    
+    -- Checking the existence of a right in the configuration
+    if (not DanLib.BaseConfig.Permissions[permission]) then
+        if SERVER then
+            print('[DanLib] Warning: Permission "' .. permission .. '" not registered!')
+        end
         return false
     end
-
-    -- Check if the requested permission exists for the given rank
-    local hasPermission = playerRank.Permission[permission] == true
-    -- print('Checking the permission for the rank identifier:', rankID, ' Result: ', hasPermission)
-    return hasPermission
+    
+    -- Getting rank rights
+    local permissions = GetRankData(rankID, 'Permission', { })
+    return permissions[permission] == true
 end
 
-
-
---- Gets statistics on the ranks of players on the server.
--- @return: Table with the number of players at each rank.
---
---- Example of outputting statistics by ranks to the console
---    local statistics = base.GetRankStatistics()
---    for rankID, data in pairs(statistics) do
---        print('Rank: ' .. data.RankName .. ' - Players: ' .. data.Count)
---    end
-function base.GetRankStatistics()
+--- Gets rank statistics on the server
+-- @return table: A table with the number of players in each rank
+function DBase:GetRankStatistics()
     local rankStats = {}
-    local players = player.GetAll() -- Get all players on the server
-
-    for _, player in ipairs(players) do
-        local rankID = player:get_danlib_rank() -- Get player's rank
+    local players = _playerGetAll()
+    local ranks = DanLib.ConfigMeta.BASE:GetValue('Ranks') or {}
+    
+    for _, ply in _ipairs(players) do
+        local rankID = ply:get_danlib_rank_cached()
+        
+        -- Initialization if the rank occurs for the first time
         if (not rankStats[rankID]) then
+            local rankData = ranks[rankID]
             rankStats[rankID] = { 
                 Count = 0, 
-                RankName = player:get_danlib_rank_name() 
-            } -- Initialise if the rank has not been added yet
+                RankName = rankData and rankData.Name or 'Member',
+                RankColor = rankData and rankData.Color or Color(255, 255, 255)
+            }
         end
-        rankStats[rankID].Count = rankStats[rankID].Count + 1 -- Increase the player count for this rank
+        
+        rankStats[rankID].Count = rankStats[rankID].Count + 1
     end
-
-    return rankStats -- Return table with statistics
+    
+    return rankStats
 end
 
-
-if (CLIENT) then
-    --- Command to set a player's rank from the client.
-    -- @param pPlayer: The player executing the command.
-    -- @param cmd: The command being executed.
-    -- @param args: The arguments passed to the command.
-    -- @param str: The command string.
+if CLIENT then
+    --- The command to set the player's rank
     local function setrank(pPlayer, cmd, args, str)
-        if (not base.HasPermission(pPlayer, 'EditRanks')) then
-            base:ScreenNotification(base:L('#access.denied'), base:L('#access.ver'), 'ERROR', 6)
-            return
-        end
-
+        -- Validation of arguments
         if (#args < 2) then
-            print('ERROR: Command syntax: danlib_setrank <player_name> <rank_id>')
+            print('[DanLib] Usage: danlib_setrank <player_name> <rank_id>')
             return
         end
-
-        local target = base:FindPlayer(args[1])
+        
+        -- Rights verification (preliminary, basic on the server)
+        if (not DBase.HasPermission(LocalPlayer(), 'EditRanks')) then
+            DBase:ScreenNotification(DBase:L('#access.denied'), DBase:L('#access.ver'), 'ERROR', 6)
+            return
+        end
+        
+        -- Player Search
+        local target = DBase:FindPlayer(args[1])
         if (not target) then
-            print('ERROR: Name not found! Command syntax: danlib_setrank <player_name> <rank_id>')
+            print('[DanLib] Error: Player "' .. args[1] .. '" not found!')
+            print('[DanLib] Usage: danlib_setrank <player_name> <rank_id>')
             return
         end
-
-        local tbl = DanLib.ConfigMeta.BASE:GetValue('Ranks') or {}
-        if (not tbl or not tbl[args[2]]) then
-            print('ERROR: No ID rank found for "' .. args[2] .. '"!')
+        
+        -- Checking the existence of a rank
+        local ranks = DanLib.ConfigMeta.BASE:GetValue('Ranks') or {}
+        if (not ranks[args[2]]) then
+            print('[DanLib] Error: Rank ID "' .. args[2] .. '" does not exist!')
             return
         end
-
-        -- Initiate network message to set rank
-        network:Start('DanLib.NetSetRank')
-        network:WriteEntity(target)
-        network:WriteString(args[2])
-        network:SendToServer()
+        
+        -- Sending a request to the server
+        DNetwork:Start('DanLib.NetSetRank')
+        DNetwork:WriteEntity(target)
+        DNetwork:WriteString(args[2])
+        DNetwork:SendToServer()
+        
+        print('[DanLib] Rank change request sent for ' .. target:Name())
     end
-
-
-    --- Provides autocomplete suggestions for player names.
-    -- @param command: Unused parameter.
-    -- @param str: The input string for autocomplete.
-    -- @return: A table of suggested completions.
+    
+    --- Auto-completion for the team
     local function autocomplete(command, str)
-        str = str:sub(2, -1) -- Remove the leading '/' from the command
-        local tbl = {}
-
-        -- Split the input into words to determine which argument is being completed
-        local args = string.Split(str, " ")
+        str = str:sub(2, -1) -- Removing the '/' at the beginning
+        local suggestions = {}
+        local args = _stringSplit(str, ' ')
+        
         if (#args == 1) then
-            -- Completing player names
-            for _, v in pairs(player.GetHumans()) do
-                Table:Add(tbl, v:Name() .. ' ') -- Use player name for completion
+            -- Adding player names
+            for _, ply in _ipairs(_playerGetAll()) do
+                if ply:IsBot() then
+                    continue
+                end
+                DTable:Add(suggestions, 'danlib_setrank ' .. ply:Name())
             end
         elseif (#args == 2) then
-            -- Completing rank IDs
-            local rankIdInput = args[2] -- Get the second argument (rank ID)
-            local ranks = DanLib.ConfigMeta.BASE:GetValue('Ranks') or {}
-
-            for id, _ in pairs(ranks) do
-                if id:find(rankIdInput) then
-                    Table:Add(tbl, id .. ' ') -- Add matching rank ID to suggestions
+            -- Adding Rank IDs
+            local rankInput = _stringLower(args[2])
+            local ranks = DanLib.ConfigMeta.BASE:GetValue('Ranks') or { }
+            
+            for rankID, rankData in _pairs(ranks) do
+                if _stringFind(_stringLower(rankID), rankInput, 1, true) then
+                    DTable:Add(suggestions, 'danlib_setrank ' .. args[1] .. ' ' .. rankID)
                 end
             end
         end
-
-        return tbl
+        
+        return suggestions
     end
-
-    -- Register the command with autocomplete
+    
     concommand.Add('danlib_setrank', setrank, autocomplete)
 end
