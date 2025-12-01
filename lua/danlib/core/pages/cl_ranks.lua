@@ -1,18 +1,29 @@
 /***
  *   @addon         DanLib
- *   @version       3.0.0
- *   @release_date  10/4/2023
+ *   @version       2.0.0
+ *   @release_date  01/12/2024
  *   @author        denchik
  *   @contact       Discord: denchik_gm
  *                  Steam: https://steamcommunity.com/profiles/76561198405398290/
  *                  GitHub: https://github.com/denchik5133
- *
- *   @description   Universal library for GMod Lua, combining all the necessary features to simplify script development. 
- *                  Avoid code duplication and speed up the creation process with this powerful and convenient library.
- *
- *   @usage         !danlibmenu (chat) | danlibmenu (console)
+ *   
+ *   @description   Client-side UI for rank management system with permissions,
+ *                  user list, and advanced filtering capabilities
+ *   
+ *   @changelog     2.0.0:
+ *                  - Implemented rank caching system for improved performance
+ *                  - Added debounced search for user filtering (300ms delay)
+ *                  - Optimized Paint functions with localized function calls
+ *                  - Added input validation for rank names and IDs
+ *                  - Improved permission auto-assignment on rank creation
+ *                  - Enhanced user list with real-time search (Name/SteamID/SteamID64)
+ *                  - Added rank order management with visual feedback
+ *                  - Implemented access control caching for better UX
+ *                  - Fixed checkbox display issues in permission editor
+ *                  - Added offline player rank management support
+ *                  - Centralized constants for UI consistency
+ *   
  *   @license       MIT License
- *   @notes         For feature requests or contributions, please open an issue on GitHub.
  */
 
 
@@ -22,95 +33,200 @@ local ui = DanLib.UI
 local DTable = DanLib.Table
 local DUtils = DanLib.Utils
 local DNetwork = DanLib.Network
-local RANK, _ = DanLib.UiPanel()
+local RANK = DanLib.UiPanel()
+local DTheme = DanLib.Config.Theme
 local DMaterial = DanLib.Config.Materials
 local DCustomUtils = DanLib.CustomUtils.Create
 
+-- Optimizing frequent calls
+local _IsValid = IsValid
+local _pairs = pairs
+local _ipairs = ipairs
+local _CurTime = CurTime
+local _stringFind = string.find
+local _stringLower = string.lower
+local _stringTrim = string.Trim
+local _stringGsub = string.gsub
+local _mathClamp = math.Clamp
+local _drawSimpleText = draw.SimpleText
+local _tableHasValue = table.HasValue
+local _osTime = os.time
 
---- Checks the user's access to edit ranks.
--- @return boolean: true if access is denied, otherwise false.
-function RANK:CheckAccess()
-    if DBase.HasPermission(LocalPlayer(), 'EditRanks') then
-        return
+-- CONSTANTS
+local CONSTANTS = {
+    BUTTON_SIZE = 30,
+    PANEL_HEIGHT = 60,
+    CHECKBOX_SIZE = 26,
+    ICON_SIZE = 14,
+    ANIMATION_DURATION = 0.3,
+    SEARCH_DEBOUNCE = 0.3,
+    POPUP_WIDTH = 650,
+    POPUP_HEIGHT = 400,
+    GRID_COLUMNS = 2,
+    GRID_H_MARGIN = 12,
+    GRID_V_MARGIN = 12,
+}
+
+-- CACHING
+local rankDataCache = nil
+local rankDataCacheTime = 0
+local CACHE_DURATION = 1 -- Cache updates every second
+
+-- AUXILIARY FUNCTIONS
+
+--- Debounce function for search optimization
+local function CreateDebounce(delay)
+    local timer = nil
+    return function(callback)
+        if timer then
+            timer:Stop()
+        end
+        timer = timer.Simple(delay, callback)
     end
+end
+
+--- Validation of the rank name
+local function ValidateRankName(name)
+    if (not name or name == '') then
+        return false, 'Rank name cannot be empty!'
+    end
+    
+    name = _stringTrim(name)
+    
+    if (not name:match('^[%w%s]+$')) then
+        return false, 'Role name can only contain letters, numbers, and spaces!'
+    end
+    
+    return true, name
+end
+
+--- Generating a rank ID from a name
+local function GenerateRankID(name)
+    return 'rank_' .. _stringLower(_stringGsub(name, '%s+', '_'))
+end
+
+--- Retrieves cached rank data
+function RANK:GetRanksValues()
+    local currentTime = _CurTime()
+    
+    -- We return the cache if it is fresh.
+    if rankDataCache and (currentTime - rankDataCacheTime) < CACHE_DURATION then
+        return rankDataCache
+    end
+    
+    -- Updating the cache
+    rankDataCache = DBase:RetrieveUpdatedVariable('BASE', 'Ranks') or DanLib.ConfigMeta.BASE:GetValue('Ranks')
+    rankDataCacheTime = currentTime
+    
+    return rankDataCache
+end
+
+--- Cache invalidation (to be called after changes)
+function RANK:InvalidateCache()
+    rankDataCache = nil
+    rankDataCacheTime = 0
+end
+
+--- Checking access with result caching
+function RANK:CheckAccess()
+    -- Caching the verification result
+    if (not self._accessCheckCache) then
+        self._accessCheckCache = DBase.HasPermission(LocalPlayer(), 'EditRanks')
+    end
+    
+    if self._accessCheckCache then
+        return false
+    end
+    
     DBase:QueriesPopup('WARNING', "You can't edit ranks as you don't have access to them!", nil, nil, nil, nil, true)
     return true
 end
 
---- Gets the current rank value.
--- @return table: rank values.
-function RANK:GetRanksValues()
-    return DBase:RetrieveUpdatedVariable('BASE', 'Ranks') or DanLib.ConfigMeta.BASE:GetValue('Ranks')
+--- Checking the possibility of editing the rank
+function RANK:CanEditRank(targetRankKey)
+    local values = self:GetRanksValues()
+    local actorRankKey = LocalPlayer():get_danlib_rank()
+    
+    -- Validation of input data
+    if (not targetRankKey or not actorRankKey) then
+        return true
+    end
+    
+    local actorRank = values[actorRankKey]
+    local targetRank = values[targetRankKey]
+    
+    if (not actorRank) then
+        DBase:QueriesPopup('ERROR', "Your rank '" .. actorRankKey .. "' does not exist in the configuration!", nil, nil, nil, nil, true)
+        return true
+    end
+    
+    if (not targetRank) then
+        DBase:QueriesPopup('ERROR', "Target rank '" .. targetRankKey .. "' does not exist!", nil, nil, nil, nil, true)
+        return true
+    end
+    
+    if actorRank.Order > targetRank.Order then
+        DBase:QueriesPopup('WARNING', "You can't edit this rank!", nil, nil, nil, nil, true)
+        return true
+    end
+    return false
 end
 
---- Adds a new rank.
+--- Adding a new rank
 function RANK:add_new()
-    if self:CheckAccess() then
-        return
-    end
-
+    if self:CheckAccess() then return end
     local values = self:GetRanksValues()
-    if (table.Count(values) >= DanLib.BaseConfig.RanksMax) then
-        DBase:QueriesPopup('ERROR', DBase:L('#rank.limit', { limit = DanLib.BaseConfig.RanksMax }), nil, nil, nil, nil, true)
+    local maxRanks = DanLib.BaseConfig.RanksMax or 15
+    
+    if (DTable:Count(values) >= maxRanks) then
+        DBase:QueriesPopup('ERROR', DBase:L('#rank.limit', { limit = maxRanks }), nil, nil, nil, nil, true)
         return
     end
 
     DBase:RequestTextPopup('ADD NEW', DBase:L('#rank.new'), 'New rank', nil, function(roleName)
-        -- Remove extra spaces in the role name
-        roleName = string.Trim(roleName) -- Remove spaces at the beginning and end of the role name
-
-        -- Check for invalid characters in role name
-        if (not roleName:match('^[%w%s]+$')) then
-            DBase:QueriesPopup('WARNING', 'Role name can only contain letters, numbers, and spaces!', nil, nil, nil, nil, true)
+        local isValid, result = ValidateRankName(roleName)
+        if (not isValid) then
+            DBase:QueriesPopup('WARNING', result, nil, nil, nil, nil, true)
             return
         end
-
-        -- Replace spaces with underscores for ID only
-        local roleID = 'rank_' .. string.lower(string.gsub(roleName, '%s+', '_')) -- Replace spaces with '_'
-
-        -- ID uniqueness check
-        for k, v in pairs(values) do
-            if (k == roleID) then
-                DBase:QueriesPopup('WARNING', 'A role with this ID already exists!', nil, nil, nil, nil, true)
-                return
+        
+        roleName = result
+        local roleID = GenerateRankID(roleName)
+        -- Checking the existence of a rank
+        if values[roleID] then
+            DBase:QueriesPopup('WARNING', 'A role with this ID already exists!', nil, nil, nil, nil, true)
+            return
+        end
+        -- Auto-assigning permissions
+        local defaultPermissions = {}
+        local autoAssignedCount = 0
+        
+        for permKey, permData in _pairs(DanLib.BaseConfig.Permissions) do
+            if (type(permData) == 'table' and permData.AutoAssignAll == true) then
+                defaultPermissions[permKey] = true
+                autoAssignedCount = autoAssignedCount + 1
             end
         end
 
-        -- Creating a new role
-        local newRole = {
+        -- Creating a new rank
+        values[roleID] = {
             Name = roleName,
-            Order = table.Count(values) + 1,
+            Order = DTable:Count(values) + 1,
             Color = Color(255, 255, 255),
-            Time = os.time(),
-            Permission = {}
+            Time = _osTime(),
+            Permission = defaultPermissions
         }
-
-        values[roleID] = newRole
         DBase:SetConfigVariable('BASE', 'Ranks', values)
+        self:InvalidateCache()
         self:Refresh()
+        
+        if (autoAssignedCount > 0) then
+            DBase:QueriesPopup('SUCCESS', 'Rank "' .. roleName .. '" created with ' .. autoAssignedCount .. ' default permissions!', nil, nil, nil, nil, true)
+        end
     end)
 end
 
---- Checks if the player can edit the specified rank.
--- @param actor Player: The player who is trying to edit the rank.
--- @param targetRankKey string: The key of the rank the player is trying to edit.
--- @return boolean: true if access is denied, otherwise false.
-function RANK:CanEditRank(targetRankKey)
-    local values = self:GetRanksValues()
-    local actorRankKey = LocalPlayer():get_danlib_rank() -- Getting a player's rank
-    local actorRankOrder = values[actorRankKey].Order -- Player rank level
-    local targetRankOrder = values[targetRankKey].Order -- Editable rank level
-
-    -- If a player's rank is greater than or equal to the rank they are trying to edit, access is denied
-    if (actorRankOrder > targetRankOrder) then
-        DBase:QueriesPopup('WARNING', "You can't edit this rank!", nil, nil, nil, nil, true)
-        return true
-    end
-
-    return false
-end
-
---- Fills the panel with the required interface components.
+--- Filling in the panel
 function RANK:FillPanel()
     local width = ui:ClampScaleW(self, 700, 750)
     local height = ui:ClampScaleH(self, 500, 500)
@@ -118,13 +234,19 @@ function RANK:FillPanel()
     self:SetHeader('Rank')
     self:SetPopupWide(width)
     self:SetExtraHeight(height)
-    self:SetSettingsFunc(true, 'Update', nil, function()
-        if self:CheckAccess() then
-            return
-        end
-
+    self:SetSettingsFunc('Update', nil, function()
+        if self:CheckAccess() then return end
         DNetwork:Start('DanLib.RequestRankData')
         DNetwork:SendToServer()
+    end)
+    self:ApplyEvent('OnClose', function()
+        -- Clearing the local cache of the panel
+        self._accessCheckCache = nil
+        self._sortedRanksCache = nil
+        self._lastRefreshTime = nil
+        
+        -- Resetting the global cache
+        self:InvalidateCache()
     end)
 
     local mainNavPanel = DCustomUtils(self)
@@ -134,66 +256,64 @@ function RANK:FillPanel()
 
     local grid = DBase.CreateGridPanel(self.tabs)
     grid:Pin(FILL, 6)
-    grid:SetColumns(2)
-    grid:SetHorizontalMargin(12)
-    grid:SetVerticalMargin(12)
+    grid:SetColumns(CONSTANTS.GRID_COLUMNS)
+    grid:SetHorizontalMargin(CONSTANTS.GRID_H_MARGIN)
+    grid:SetVerticalMargin(CONSTANTS.GRID_V_MARGIN)
+
     self.grid = grid
     self.tabs:AddTab(grid, 'Ranks')
-
     self:UsersList()
-    self:Refresh() -- Interface update
+    self:Refresh()
 end
 
---- Updates the interface with the current rank values.
+--- Interface update
 function RANK:Refresh()
     self.grid:Clear()
     local values = self:GetRanksValues()
 
-    -- Sorting ranks in order
-    local sorted = {}
-    for k, v in pairs(values) do
-        DTable:Add(sorted, { v.Order, k })
+    -- Cached sorting
+    if (not self._sortedRanksCache or self._lastRefreshTime ~= rankDataCacheTime) then
+        local sorted = {}
+        for k, v in _pairs(values) do
+            DTable:Add(sorted, { v.Order, k })
+        end
+        DTable:SortByMember(sorted, 1, false)
+        self._sortedRanksCache = sorted
+        self._lastRefreshTime = rankDataCacheTime
     end
-    DTable:SortByMember(sorted, 1, false)
 
-    local panelH = 60
-    for k, v in ipairs(sorted) do
+    local sorted = self._sortedRanksCache
+    for k, v in _ipairs(sorted) do
         local Key = v[2]
         local rolePanel = DCustomUtils()
-        rolePanel:SetTall(panelH)
+        rolePanel:SetTall(CONSTANTS.PANEL_HEIGHT)
         self.grid:AddCell(rolePanel, nil, false)
-
-        self:CreateRankPanel(rolePanel, values, Key, sorted, panelH, k)
+        self:CreateRankPanel(rolePanel, values, Key, sorted, k)
     end
-
     self:CreateAddRankButton()
 end
 
---- Creates a panel for a specific rank.
--- @param rolePanel Panel: The panel on which the rank will be displayed.
--- @param values table: Current rank values.
--- @param Key string: The key of the rank.
--- @param RankColor Color: The colour of the rank.
--- @param name string: The name of the rank.
--- @param panelH number: Height of the panel.
--- @param k number: Rank index.
-function RANK:CreateRankPanel(rolePanel, values, Key, sorted, panelH, k)
-    local RankColor = values[Key].Color or DBase:Theme('title')
-    local name = values[Key].Name or 'unknown'
-    local id = Key or 'unknown'
+--- Creating a Rank panel
+function RANK:CreateRankPanel(rolePanel, values, Key, sorted, k)
+    local rankData = values[Key]
+    local RankColor = rankData.Color or DBase:Theme('title')
+    local name = rankData.Name or 'unknown'
+    local panelH = CONSTANTS.PANEL_HEIGHT
 
+    -- Order number
     local orderNum = DCustomUtils(rolePanel)
     orderNum:PinMargin(LEFT, nil, nil, 8)
     orderNum:SetWide(26)
     orderNum:ApplyBackground(Color(35, 46, 62), 6)
-    orderNum:ApplyText(values[Key].Order, 'danlib_font_18', nil, nil, Color(255, 255, 255, 50), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    orderNum:ApplyText(rankData.Order, 'danlib_font_18', nil, nil, Color(255, 255, 255, 50), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
+    -- Move buttons
     local function createMoveButton(icon, direction)
         local moveButton = DBase.CreateUIButton(orderNum, {
             background = { nil },
             hover = { nil },
             tall = panelH / 2 - 8,
-            wide = size,
+            wide = CONSTANTS.ICON_SIZE,
             paint = function(sl, w, h)
                 self:DrawMoveButtonEffect(sl, h, icon, direction)
             end,
@@ -203,10 +323,10 @@ function RANK:CreateRankPanel(rolePanel, values, Key, sorted, panelH, k)
         })
         return moveButton
     end
-
     createMoveButton(DMaterial['Up-Arrow'], 'up'):Pin(TOP)
     createMoveButton(DMaterial['Arrow'], 'down'):Dock(BOTTOM)
 
+    -- Main panel
     local Panel = DCustomUtils(rolePanel)
     Panel:Pin()
     Panel:ApplyBackground(DBase:Theme('secondary_dark'), 6)
@@ -214,86 +334,62 @@ function RANK:CreateRankPanel(rolePanel, values, Key, sorted, panelH, k)
         DUtils:DrawRoundedMask(6, 0, 0, w, h, function()
             DUtils:DrawRect(0, 0, 4, h, RankColor)
         end)
-        DUtils:DrawDualText(13, h / 2 - 10, name, 'danlib_font_18', RankColor, 'Added ' .. DBase:FormatHammerTime(values[Key].Time) or '', 'danlib_font_16', DBase:Theme('text'), TEXT_ALIGN_LEFT, nil, w - 50)
-        draw.SimpleText('ID: ' .. Key or nil, 'danlib_font_16', 13, h / 2 + 16, DBase:Theme('text'), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+
+        DUtils:DrawDualText(13, h / 2 - 10, name, 'danlib_font_18', RankColor, 'Added ' .. DBase:FormatHammerTime(rankData.Time), 'danlib_font_16', DBase:Theme('text'), TEXT_ALIGN_LEFT, nil, w - 50)
+        _drawSimpleText('ID: ' .. Key, 'danlib_font_16', 13, h / 2 + 16, DBase:Theme('text'), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
     end)
 
     self:CreateRankActionButton(Panel, Key, values, RankColor, name)
 end
 
---- Draws an effect on the move button.
--- @param sl Panel: The panel of the button.
--- @param h number: Height of the button.
--- @param direction string: The direction of movement.
+--- Rendering the move button effect
 function RANK:DrawMoveButtonEffect(sl, h, icon, direction)
     local lastClicked = sl.lastClicked or 0
-    local clickPercent = math.Clamp((CurTime() - lastClicked) / 0.3, 0, 1)
+    local clickPercent = _mathClamp((_CurTime() - lastClicked) / CONSTANTS.ANIMATION_DURATION, 0, 1)
 
-    if (CurTime() < lastClicked + 0.3) then
+    if (_CurTime() < lastClicked + CONSTANTS.ANIMATION_DURATION) then
         local w = sl:GetWide()
         local boxH = h * clickPercent
         DUtils:DrawRoundedMask(6, 0, 0, w, h, function()
-            DUtils:DrawRect(0, direction == 'up' and h - boxH or 0, w, boxH, ColorAlpha(DanLib.Config.Theme['Red'], 100))
+            DUtils:DrawRect(0, direction == 'up' and h - boxH or 0, w, boxH, ColorAlpha(DTheme['Red'], 100))
         end)
     end
 
-    local iconSize = 14 * clickPercent
+    local iconSize = CONSTANTS.ICON_SIZE * clickPercent
     DUtils:DrawIcon(sl:GetWide() / 2 - iconSize / 2, h / 2 - iconSize / 2, iconSize, iconSize, icon, Color(238, 238, 238, 50))
 end
 
---- Moves the rank up or down.
--- @param sl Panel: The panel of the button.
--- @param direction string: Direction of movement.
--- @param k number: Index of the current rank.
--- @param sorted table: Sorted list of ranks.
--- @param values table: Current rank values.
--- @param key string: Rank key.
+--- Moving the rank
 function RANK:MoveRank(sl, direction, k, sorted, values, Key)
-    sl.lastClicked = CurTime()
-
-    -- Получаем текущий ранг игрока
-    local actor = LocalPlayer()
-    local actorRankKey = actor:get_danlib_rank() -- Get the player's rank key
-
-    -- Check if the player can edit the target rank
-    -- If the player cannot edit, exit the function
+    sl.lastClicked = _CurTime()
     if self:CanEditRank(Key) then
         return
     end
 
-    if (direction == 'up' and k > 1) then
-        local aboveKey = sorted[k - 1][2]
-        -- Checking if a player can move up a rank
-        -- If the player's rank is higher, we disallow movement
-        if self:CanEditRank(aboveKey) then return end
-        -- Moving rank
-        values[aboveKey].Order, values[Key].Order = values[Key].Order, values[aboveKey].Order
-        DBase:SetConfigVariable('BASE', 'Ranks', values)
-        self:Refresh()
-    elseif (direction == 'down' and k < #sorted) then
-        local belowKey = sorted[k + 1][2]
-        -- Check if a player can move a rank lower
-        -- If the player's rank is lower, disallow the move
-        if self:CanEditRank(belowKey) then return end
-        -- Moving rank
-        values[belowKey].Order, values[Key].Order = values[Key].Order, values[belowKey].Order
-        DBase:SetConfigVariable('BASE', 'Ranks', values)
-        self:Refresh()
+    local swapIndex = direction == 'up' and k - 1 or k + 1
+    if (swapIndex < 1 or swapIndex > #sorted) then
+        return
     end
+    
+    local swapKey = sorted[swapIndex][2]
+    if self:CanEditRank(swapKey) then
+        return
+    end
+
+    -- Exchange of order
+    values[swapKey].Order, values[Key].Order = values[Key].Order, values[swapKey].Order
+    
+    DBase:SetConfigVariable('BASE', 'Ranks', values)
+    self:InvalidateCache()
+    self:Refresh()
 end
 
---- Creates a button for rank actions.
--- @param Panel Panel: Panel for the button.
--- @param Key string: The key of the rank.
--- @param values table: Current rank values.
--- @param RankColor Color: The colour of the rank.
--- @param name string: The name of the rank.
+--- Creating action buttons above the rank
 function RANK:CreateRankActionButton(Panel, Key, values, RankColor, name)
-    local size = 30
-    local topMargin = (60 - size) / 2
-
+    local size = CONSTANTS.BUTTON_SIZE
+    local topMargin = (CONSTANTS.PANEL_HEIGHT - size) / 2
     local buttons = {
-        { Name = 'Edit name', Icon = DMaterial['Edit'], Col = DanLib.Config.Theme['Blue'], Func = function() 
+        { Name = 'Edit name', Icon = DMaterial['Edit'], Col = DTheme['Blue'], Func = function() 
             if self:CanEditRank(Key) then return end
             self:EditRankName(Key, values, name) 
         end },
@@ -305,91 +401,101 @@ function RANK:CreateRankActionButton(Panel, Key, values, RankColor, name)
             if self:CanEditRank(Key) then return end
             self:ChangeRankColor(Key, values) 
         end },
-        { Name = DBase:L('#delete'), Icon = DMaterial['Delete'], Col = DanLib.Config.Theme['Red'],
-        hide = (Key == 'rank_owner'), -- Hide the button if it is the owner's rank
-        Func = function() 
+        { Name = DBase:L('#delete'), Icon = DMaterial['Delete'], Col = DTheme['Red'],
+          hide = (Key == 'rank_owner'),
+          Func = function() 
             if self:CanEditRank(Key) then return end
             self:DeleteRank(Key, values) 
         end }
     }
 
-    local button = DBase.CreateUIButton(Panel, {
+    DBase.CreateUIButton(Panel, {
         dock_indent = { RIGHT, nil, topMargin, topMargin, topMargin },
         wide = size,
         icon = { DMaterial['Edit'] },
         tooltip = { DBase:L('#edit'), nil, nil, TOP },
         click = function(sl)
-            if self:CheckAccess() then
-                return
-            end
+            if self:CheckAccess() then return end
 
-            local menu = DBase:UIContextMenu(self)
-            for _, v in ipairs(buttons) do
-                if (not v.hide) then
-                    menu:Option(v.Name, v.Col or nil, v.Icon, v.Func)
+            local context = DBase:UIContextMenu(self)
+            for _, v in _ipairs(buttons) do
+                if not v.hide then
+                    context:Option(v.Name, v.Col, v.Icon, v.Func)
                 end
             end
 
-            local mouse_x = gui.MouseX()
-            local mouse_y = gui.MouseY()
-            menu:Open(mouse_x + 30, mouse_y - 24, sl)
+            local mouse_x, mouse_y = gui.MouseX(), gui.MouseY()
+            context:Open(mouse_x + 30, mouse_y - 24, sl)
         end
     })
 end
 
---- Edits the rank name.
--- @param Key string: The key of the rank.
--- @param values table: Current rank values.
--- @param name string: Rank name.
+--- Editing the rank name
 function RANK:EditRankName(Key, values, name)
     DBase:RequestTextPopup('RANK NAME', DBase:L('#rank.name'), name, nil, function(newName)
-        if values[newName] then
+        local isValid, result = ValidateRankName(newName)
+        if (not isValid) then
+            DBase:QueriesPopup('WARNING', result, nil, nil, nil, nil, true)
+            return
+        end
+        
+        newName = result
+        local newID = GenerateRankID(newName)
+        
+        if (values[newID] and newID ~= Key) then
             DBase:QueriesPopup('WARNING', DBase:L('#rank.name.exists'), nil, nil, nil, nil, true)
             return
         end
 
-        -- Saving old data
+        -- Saving data
         local rankData = values[Key]
-        values[newName] = rankData
-        values[newName].Time = os.time() -- Updating time
-
-        -- Deleting an old rank
-        values[Key] = nil
+        rankData.Name = newName
+        rankData.Time = _osTime()
+        
+        -- If the ID has changed, we will transfer it.
+        if (newID ~= Key) then
+            values[newID] = rankData
+            values[Key] = nil
+        end
 
         DBase:SetConfigVariable('BASE', 'Ranks', values)
+        self:InvalidateCache()
         self:Refresh()
     end)
 end
 
---- Deletes the rank.
--- @param Key string: Rank key.
--- @param values table: Current rank values.
+--- Removing a rank
 function RANK:DeleteRank(Key, values)
-    if (table.Count(values) <= 1) then
+    if (DTable:Count(values) <= 1) then
         DBase:QueriesPopup('WARNING', "You can't delete this rank, at least one rank must remain!", nil, nil, nil, nil, true)
+        return
+    end
+    
+    if (Key == 'rank_member') then
+        DBase:QueriesPopup('ERROR', "You cannot delete 'rank_member' as it is the default rank!", nil, nil, nil, nil, true)
         return
     end
 
     DBase:QueriesPopup('DELETION', DBase:L('#deletion.description'), nil, function()
         values[Key] = nil
         DBase:SetConfigVariable('BASE', 'Ranks', values)
+        self:InvalidateCache()
         self:Refresh()
     end)
 end
 
---- Changes the colour of the rank.
--- @param Key string: Rank key.
--- @param values table: Current rank values.
+--- Changing the color of the rank
 function RANK:ChangeRankColor(Key, values)
     local RankColor = values[Key].Color
     DBase:RequestColorChangesPopup('COLOR', RankColor, nil, function(value)
         values[Key].Color = value
         DBase:SetConfigVariable('BASE', 'Ranks', values)
+        self:InvalidateCache()
         self:Refresh()
     end)
 end
 
---- Creates a button to add a new rank.
+--- Creating a rank addition button
 function RANK:CreateAddRankButton()
     local createNew = DBase.CreateUIButton(nil, {
         dock_indent = { RIGHT, nil, 7, 6, 7 },
@@ -397,174 +503,261 @@ function RANK:CreateAddRankButton()
         text = { 'Add a new rank', nil, nil, nil, DBase:Theme('text', 200) },
         click = function() self:add_new() end
     })
-
     self.grid:AddCell(createNew, nil, false)
 end
 
---- Opens a window for editing rank permissions.
--- @param Key string: Rank key.
--- @param values table: Current rank values.
+--- Permissions Editing window
 function RANK:editPopup(Key, values)
-    if IsValid(Container) then
+    if _IsValid(Container) then
         return
     end
 
-    Container = vgui.Create('DanLib.UI.PopupBasis')
+    Container = DBase.CreateUIPopupBasis()
     Container:SetHeader('Permission - ' .. Key)
-    local x, y = 650, 400
-    Container:SetPopupWide(x)
-    Container:SetExtraHeight(y)
+    Container:SetPopupWide(CONSTANTS.POPUP_WIDTH)
+    Container:SetExtraHeight(CONSTANTS.POPUP_HEIGHT)
     
     local fieldsBack = DCustomUtils(Container, 'DanLib.UI.Scroll')
-    fieldsBack:Pin(FILL, 6)
+    fieldsBack:Pin(nil, 6)
     fieldsBack:ToggleScrollBar()
-
-    -- Get the permissions of the current rank of the player
     local playerPermissions = LocalPlayer():get_danlib_rank_permissions()
 
+    -- Sorting permissions
     local sorted = {}
-    for k, v in pairs(DanLib.BaseConfig.Permissions) do
+    for k, v in _pairs(DanLib.BaseConfig.Permissions) do
         DTable:Add(sorted, { k, k })
     end
     DTable:SortByMember(sorted, 1, true)
 
-    for k, v in pairs(sorted) do
+    for k, v in _pairs(sorted) do
         local mKey = v[2]
-        local title = DanLib.BaseConfig.Permissions[mKey]
-        local size = 26
+        local permData = DanLib.BaseConfig.Permissions[mKey]
+        local title = type(permData) == 'table' and (permData.Description or 'No description') or (permData or 'No description')
+
         local panel = DCustomUtils(fieldsBack)
         panel:PinMargin(TOP, 8, 8, 6)
-        panel:ApplyShadow(10, false, 8)
         panel:ApplyBackground(DBase:Theme('secondary_dark'), 6)
         panel:SetTall(46)
         panel:ApplyEvent(nil, function(sl, w, h)
-            DUtils:DrawDualText(8, h / 2 - 1, mKey, 'danlib_font_20', DBase:Theme('decor'), title, 'danlib_font_18', DBase:Theme('text'), TEXT_ALIGN_LEFT, nil, w - size - 4)
+            DUtils:DrawDualText(8, h / 2 - 1, mKey, 'danlib_font_20', DBase:Theme('decor'), title, 'danlib_font_18', DBase:Theme('text'), TEXT_ALIGN_LEFT, nil, w - CONSTANTS.CHECKBOX_SIZE - 20)
         end)
 
-        local margin = (panel:GetTall() - size) * 0.5
-
+        local margin = (panel:GetTall() - CONSTANTS.CHECKBOX_SIZE) * 0.5 - 4
         local CheckBox = DBase.CreateCheckbox(panel)
         CheckBox:PinMargin(RIGHT, nil, margin, 10, margin)
-        CheckBox:SetWide(size)
+        CheckBox:SetWide(CONSTANTS.CHECKBOX_SIZE + 4)
         CheckBox:SetValue(values[Key].Permission[mKey] or false)
-        CheckBox:DisableShadows(10)
 
-        -- Check if the player has the right to edit this permission
         if (not playerPermissions[mKey] and not playerPermissions.all_access) then
-            CheckBox:SetDisabled(true) -- Disable the checkbox if the player does not have the permission
+            CheckBox:SetDisabled(true)
         end
 
         function CheckBox:OnChange(value)
             values[Key] = values[Key] or {}
-            values[Key].Permission[mKey] = values[Key].Permission[mKey] or {}
+            values[Key].Permission = values[Key].Permission or {}
             values[Key].Permission[mKey] = value
-
             DBase:SetConfigVariable('BASE', 'Ranks', values)
         end
     end
 end
 
+--- User list (with debounce search)
 function RANK:UsersList()
     local userPanel = DCustomUtils(self.tabs)
     self.tabs:AddTab(userPanel, 'Users')
 
-    local scroll = DCustomUtils(userPanel, 'DanLib.UI.Scroll')
-    scroll:Pin(FILL)
+    -- Search Bar
+    local searchPanel = DCustomUtils(userPanel)
+    searchPanel:PinMargin(TOP, nil, 8, 8, 8)
+    searchPanel:SetTall(40)
+    searchPanel:ApplyBackground(DBase:Theme('secondary_dark'), 6)
 
-    -- Create an empty list for users
-    self.userList = {}
-
-    -- Handler to get user data
-    DNetwork:Receive('DanLib.SendRankData', function()
-        local allRankData = DNetwork:ReadTable() -- Retrieve table with data
-        self:UpdateUserList(scroll, allRankData) -- Update the list of users
+    local searchEntry = DBase.CreateTextEntry(searchPanel)
+    searchEntry:PinMargin(nil, 10, 6, 10, 6)
+    searchEntry:SetBackText('Search by Name, SteamID, or SteamID64...')
+    
+    self.searchQuery = ''
+    local rankPanel = self
+    
+    -- Debounce for optimization
+    local searchDebounce = CreateDebounce(CONSTANTS.SEARCH_DEBOUNCE)
+    searchEntry:ApplyEvent('OnValueChange', function(sl, value)
+        rankPanel.searchQuery = _stringLower(value or '')
+        searchDebounce(function()
+            if rankPanel.lastRankData then
+                rankPanel:UpdateUserList(rankPanel.userScroll, rankPanel.lastRankData)
+            end
+        end)
     end)
 
-    -- Call a request to the server to get the data
+    -- Update button
+    DBase.CreateUIButton(searchPanel, {
+        dock = { RIGHT, 6 },
+        wide = 130,
+        text = { 'Refresh List', nil, nil, nil, DBase:Theme('text') },
+        click = function()
+            DNetwork:Start('DanLib.RequestRankData')
+            DNetwork:SendToServer()
+        end
+    })
+
+    -- Scroll for users
+    local scroll = DCustomUtils(userPanel, 'DanLib.UI.Scroll')
+    scroll:Pin(nil, 6)
+
+    self.userList = {}
+    self.userScroll = scroll
+    self.lastRankData = {}
+
+    -- Getting user data
+    DNetwork:Receive('DanLib.SendRankData', function()
+        local allRankData = DNetwork:ReadTable()
+        self.lastRankData = allRankData
+        self:UpdateUserList(scroll, allRankData)
+    end)
+
+    -- Initial request
     DNetwork:Start('DanLib.RequestRankData')
     DNetwork:SendToServer()
 end
 
+--- Updating the user list
 function RANK:UpdateUserList(scroll, allRankData)
-    -- Clearing previous items in the list
-    for _, user in ipairs(self.userList) do
-        user:Remove()
+    -- Cleaning old items
+    for _, user in _ipairs(self.userList) do
+        if _IsValid(user) then
+            user:Remove()
+        end
     end
+
     self.userList = {}
 
-    -- Updating the list of users
-    for steamID64, data in pairs(allRankData) do
-        local avatarBackSize = 40
-        local text_w = avatarBackSize + 24
-        local name = steamworks.GetPlayerName(steamID64) or '' -- Get name, or empty string
-        local pPlayer = player.GetBySteamID64(steamID64)
+    -- Sorting users
+    local sortedUsers = {}
+    for steamID64, data in _pairs(allRankData) do
+        DTable:Add(sortedUsers, {
+            steamID64 = steamID64,
+            data = data,
+            time = data.Time or 0
+        })
+    end
+    
+    DTable:Sort(sortedUsers, function(a, b)
+        return (a.time or 0) > (b.time or 0)
+    end)
+
+    local searchQuery = self.searchQuery or ''
+    local ranks = DanLib.ConfigMeta.BASE:GetValue('Ranks') or {}
+
+    -- Displaying users
+    for _, userData in _ipairs(sortedUsers) do
+        local steamID64 = userData.steamID64
+        local data = userData.data
         
-        local rankName = pPlayer and pPlayer:get_danlib_rank_name() or 'Member'
-        local rankColor = pPlayer and pPlayer:get_danlib_rank_color() or Color(0, 151, 230, 255)
+        local pPlayer = player.GetBySteamID64(steamID64)
+        local isOnline = _IsValid(pPlayer)
+        
+        local name = steamworks.GetPlayerName(steamID64) or 'Unknown'
+        local steamID = util.SteamIDFrom64(steamID64) or ''
+        
+        -- Filtering by search
+        if searchQuery ~= '' then
+            local nameMatch = _stringFind(_stringLower(name), searchQuery, 1, true)
+            local steamIDMatch = _stringFind(_stringLower(steamID), searchQuery, 1, true)
+            local steamID64Match = _stringFind(steamID64, searchQuery, 1, true)
+            
+            if (not nameMatch and not steamIDMatch and not steamID64Match) then
+                continue
+            end
+        end
+        
+        local rankID = data.Rank or 'rank_member'
+        local rankData = ranks[rankID]
+        local rankName = rankData and rankData.Name or 'Member'
+        local rankColor = rankData and rankData.Color or Color(255, 255, 255)
 
         -- Set default value for name if it is empty or equal to nil
         -- Or 'Unknown', depending on your preference
         name = (name and name ~= '') and name or 'BOT'
-
-        local user = DCustomUtils(scroll)
-        user:PinMargin(TOP, 4, nil, 6, 8)
-        user:SetTall(60)
-        user:ApplyBackground(DBase:Theme('secondary_dark'), 6)
-        user:ApplyEvent(nil, function(sl, w, h)
-            DUtils:DrawDualText(text_w, h / 2 - 9, name, 'danlib_font_16', DBase:Theme('decor'), 'ID: ' .. steamID64, 'danlib_font_16', DBase:Theme('text'), TEXT_ALIGN_LEFT, nil, w - 40)
-            draw.SimpleText(rankName, 'danlib_font_16', text_w, h - 15, rankColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        
+        -- Creating a User Panel
+        local userPanel = DCustomUtils(scroll)
+        userPanel:PinMargin(TOP, nil, nil, 4, 8)
+        userPanel:ApplyBackground(DBase:Theme('secondary_dark'), 6)
+        userPanel:SetTall(60)
+        userPanel:ApplyEvent(nil, function(sl, w, h)
+            -- Online Status
+            local statusColor = isOnline and Color(76, 175, 80) or Color(158, 158, 158)
+            draw.RoundedBox(8, 8, h / 2 - 4, 8, 8, statusColor)
+            
+            -- Name and information
+            DUtils:DrawDualText(24, h / 2 - 10, name, 'danlib_font_18', Color(255, 255, 255), 'Rank: ' .. rankName, 'danlib_font_16', rankColor, TEXT_ALIGN_LEFT, nil, w - 100)
+            _drawSimpleText('SteamID: ' .. steamID, 'danlib_font_14', 24, h / 2 + 14, DBase:Theme('text', 150), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
         end)
+        
+        -- Action button (if you have rights)
+        if DBase.HasPermission(LocalPlayer(), 'EditRanks') then
+            local size = CONSTANTS.BUTTON_SIZE
+            local topMargin = (60 - size) / 2
+            
+            DBase.CreateUIButton(userPanel, {
+                dock_indent = { RIGHT, nil, topMargin, topMargin, topMargin },
+                wide = size,
+                icon = { DMaterial['Edit'] },
+                tooltip = { 'Edit User', nil, nil, TOP },
+                click = function(sl)
+                    if self:CheckAccess() then
+                        return
+                    end
 
-        local avatar = DCustomUtils(user)
-        avatar:ApplyAvatar()
-        avatar:SetSteamID(steamID64, 64)
-        avatar:SetSize(avatarBackSize, avatarBackSize)
-        avatar:SetPos(12, user:GetTall() / 2 - avatarBackSize / 2)
-
-        local size = 32
-        local margin = (user:GetTall() - size) * 0.5
-        local ranks = DanLib.ConfigMeta.BASE:GetValue('Ranks') or {}
-
-        DBase.CreateUIButton(user, {
-            dock_indent = { RIGHT, nil, margin, 10, margin },
-            wide = size,
-            icon = { DMaterial['Edit'] },
-            tooltip = { DBase:L('#edit'), nil, nil, TOP },
-            click = function(sl)
-                if self:CheckAccess() then
-                    return
-                end
-
-                local menu = DBase:UIContextMenu(self)
-                menu:Option(DBase:L('#rank.copy.name'), nil, nil, function() DBase:ClipboardText(rankName) end)
-                menu:Option(DBase:L('#copy_id'), nil, nil, function() DBase:ClipboardText(steamID64) end)
-                menu:Option(DBase:L('#rank.copy.id'), nil, nil, function() DBase:ClipboardText(steamID64) end)
-                menu:Option(DBase:L('#edit.rank'), nil, nil, function()
-                    local options = {}
-                    local function d()
-                        for k, v in pairs(ranks or {}) do
+                    local context = DBase:UIContextMenu(self)
+                    context:Option(DBase:L('#rank.copy.name'), nil, nil, function() DBase:ClipboardText(rankName) end)
+                    context:Option(DBase:L('#copy_id'), nil, nil, function() DBase:ClipboardText(steamID64) end)
+                    context:Option('Copy SteamID', nil, nil, function() DBase:ClipboardText(steamID) end)
+                    
+                    -- Change the rank (for online and offline)
+                    context:Option(DBase:L('#edit.rank'), nil, nil, function()
+                        local options = {}
+                        for k, v in _pairs(ranks or { }) do
                             options[k] = v.Name
                         end
-                        return options
-                    end
-                    d()
 
-                    DBase:ComboRequestPopup(DBase:L('#rank.list'), DBase:L('#select.assign.rank'), options, rankName, nil, function(value, data)
-                        if self:CanEditRank(data) then
-                            return
-                        end
-                        
-                        DNetwork:Start('DanLib.NetSetRank')
-                        DNetwork:WriteEntity(pPlayer)
-                        DNetwork:WriteString(data)
-                        DNetwork:SendToServer()
+                        DBase:ComboRequestPopup(DBase:L('#rank.list'), DBase:L('#select.assign.rank'), options, rankName, nil, function(value, selectedRankID)
+                            if self:CanEditRank(selectedRankID) then
+                                return
+                            end
+                            
+                            if isOnline then
+                                DNetwork:Start('DanLib.NetSetRank')
+                                DNetwork:WriteEntity(pPlayer)
+                                DNetwork:WriteString(selectedRankID)
+                                DNetwork:SendToServer()
+                            else
+                                DNetwork:Start('DanLib.NetSetOfflineRank')
+                                DNetwork:WriteString(steamID64)
+                                DNetwork:WriteString(selectedRankID)
+                                DNetwork:SendToServer()
+                            end
+                        end)
                     end)
-                end)
-                menu:Open()
-            end
-        })
-
-        DTable:Add(self.userList, user) -- Save the link to the user
+                    
+                    -- Delete data (offline only)
+                    if (not isOnline) then
+                        context:Option('Delete Player Data', DTheme['Red'], DMaterial['Delete'], function()
+                            DBase:QueriesPopup('DELETION', 'Are you sure you want to delete data for ' .. name .. '?', nil, function()
+                                DNetwork:Start('DanLib.NetDeleteOfflinePlayer')
+                                DNetwork:WriteString(steamID64)
+                                DNetwork:SendToServer()
+                            end)
+                        end)
+                    end
+                    
+                    context:Open()
+                end
+            })
+        end
+        
+        DTable:Add(self.userList, userPanel)
     end
 end
 
