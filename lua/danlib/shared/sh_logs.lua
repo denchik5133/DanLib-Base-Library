@@ -1,18 +1,11 @@
 /***
  *   @addon         DanLib
- *   @version       3.0.0
- *   @release_date  10/4/2023
+ *   @version       2.0.0
+ *   @release_date  01/12/2025
  *   @author        denchik
- *   @contact       Discord: denchik_gm
- *                  Steam: https://steamcommunity.com/profiles/76561198405398290/
- *                  GitHub: https://github.com/denchik5133
- *                
- *   @description   Universal library for GMod Lua, combining all the necessary features to simplify script development. 
- *                  Avoid code duplication and speed up the creation process with this powerful and convenient library.
- *
- *   @usage         !danlibmenu (chat) | danlibmenu (console)
+ *   
+ *   @description   Enhanced Discord logging system with queue, batch, and retry mechanisms
  *   @license       MIT License
- *   @notes         For feature requests or contributions, please open an issue on GitHub.
  */
 
 
@@ -50,7 +43,6 @@
  */
 
  
-
 
 DanLib.ModulesMetaLogs = {}
 
@@ -94,13 +86,40 @@ local LogsMeta = {
         return self
 	end,
 
+	--- Sends log to Discord
+	-- @param description (string): Log description
+	-- @param fields (table): Optional fields
+	-- @param colorOverride (Color): Optional color override
+	Send = function(self, description, fields, colorOverride)
+	    if SERVER then
+	        DanLib.Func:SendDiscordLog(self, description, fields, colorOverride)
+	    end
+	    return self
+	end,
+
 	--- Sets the setup function for the log
 	-- @param func: The function to set as the setup function.
 	-- @return: The log object for method chaining.
 	SetSetup = function(self, func)
 		self.SetupFunc = func
 		return self
-	end
+	end,
+
+	--- Sets the addon name for the log
+	-- @param addon (string): Addon name (e.g., 'DanLib', 'Reports', 'AdminSystem')
+	-- @return: The log object for chaining
+	SetAddon = function(self, addon)
+	    self.Addon = addon or 'Unknown'
+	    return self
+	end,
+
+	--- Sets the priority of the log
+	-- @param priority (number): Priority (1 = critical, 2 = high, 3 = normal, 4 = low)
+	-- @return: The log object for chaining
+	SetPriority = function(self, priority)
+		self.Priority = priority or 3
+		return self
+	end,
 }
 
 LogsMeta['__index'] = LogsMeta
@@ -110,7 +129,11 @@ LogsMeta['__index'] = LogsMeta
 -- @param id: The identifier for the new log.
 -- @return: A new log object with the specified ID.
 function DanLib.Func.CreateLogs(id)
-	local Log = { ID = id, Option = {}, Sort = 0 }
+	local Log = {
+		ID = id,
+		Option = {},
+		Sort = 0
+	}
 	setmetatable(Log, LogsMeta)
 	return Log
 end
