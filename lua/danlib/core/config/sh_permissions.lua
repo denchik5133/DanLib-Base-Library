@@ -67,34 +67,6 @@ function DanLib.Permissions:Register(name, description, autoAssignRanks, minAcce
     DanLib.Permissions.list[name] = permissionData
     DanLib.BaseConfig.Permissions[name] = permissionData
     
-    -- Автоматическое назначение только на СЕРВЕРЕ
-    if SERVER then
-        -- Используем правильный метод GetValue
-        local ranks = DanLib.ConfigMeta.BASE:GetValue('Ranks') or {}
-        local modified = false
-        
-        for rankID, rankData in pairs(ranks) do
-            rankData.Permission = rankData.Permission or {}
-            
-            if assignToAll then
-                if (not rankData.Permission[name]) then
-                    rankData.Permission[name] = true
-                    modified = true
-                end
-            elseif (assignRanks and table.HasValue(assignRanks, rankID)) then
-                if (not rankData.Permission[name]) then
-                    rankData.Permission[name] = true
-                    modified = true
-                end
-            end
-        end
-        
-        -- Используем правильный метод SetConfigValue
-        if modified then
-            DanLib.ConfigMeta.BASE:SetConfigValue('Ranks', ranks)
-        end
-    end
-    
     if (minAccess and SERVER) then
         print('[DanLib] WARNING: MinAccess parameter is DEPRECATED in DanLib.Permissions:Register("' .. name .. '").')
     end
