@@ -1,179 +1,924 @@
 /***
  *   @addon         DanLib
- *   @version       3.0.0
+ *   @version       2.0.0
  *   @release_date  10/4/2023
  *   @author        denchik
- *   @contact       Discord: denchik_gm
- *                  Steam: https://steamcommunity.com/profiles/76561198405398290/
- *                  GitHub: https://github.com/denchik5133
- *                
- *   @description   Universal library for GMod Lua, combining all the necessary features to simplify script development. 
- *                  Avoid code duplication and speed up the creation process with this powerful and convenient library.
- *
- *   @usage         !danlibmenu (chat) | danlibmenu (console)
+ *   @description   Interactive welcome tutorial
  *   @license       MIT License
- *   @notes         For feature requests or contributions, please open an issue on GitHub.
  */
- 
 
 
---- Welcome pop-up window for a user using the DanLib library.
--- @module PopupWelcome
 
-local width = DanLib.Func:GetSize(500)
-local height = DanLib.Func:GetSize(450)
+-- LOCALIZATION
+local DBase = DanLib.Func
+local DHook = DanLib.Hook
+local DUtils = DanLib.Utils
+local DTable = DanLib.Table
+local DNetwork = DanLib.Network
+local DOutline = DanLib.Outline
+local DFileUtil = DanLib.FileUtil
+local DTheme = DanLib.Config.Theme
+local DCustomUtils = DanLib.CustomUtils.Create
 
+local _Lerp = Lerp
+local _select = select
+local _pairs = pairs
+local _ipairs = ipairs
+local _osTime = os.time
+local _osDate = os.date
+local _IsValid = IsValid
+local _mathAbs = math.abs
+local _mathCeil = math.ceil
+local _mathRound = math.Round
+local _FrameTime = FrameTime
+local _Color = Color
+local _ColorAlpha = ColorAlpha
+local _LocalPlayer = LocalPlayer
+local _GetHostName = GetHostName
+local _drawDrawText = draw.DrawText
+local _drawSimpleText = draw.SimpleText
 
--- Updating width and height when the screen size changes
-local function ScreenSizeChanged()
-    width = DanLib.Func:GetSize(500)
-    height = DanLib.Func:GetSize(450)
-end
-DanLib.Hook:Add('DDI.PostScreenSizeChanged', 'DDI.ScreenSizeChanged', ScreenSizeChanged)
+-- CONSTANTS
+local POPUP_WIDTH = 550
+local POPUP_HEIGHT = 500
+local ANIM_SPEED = 3
 
+-- colors
+local COLOR_BG = _Color(14, 22, 33, 180)
+local COLOR_TEXT = _Color(220, 221, 225)
+local COLOR_SEPARATOR = _Color(255, 255, 255, 20)
 
---- The main function to display the welcome pop-up window.
--- @function PopupWelcome
-function DanLib.PopupWelcome()
-    if (not DanLib.FileUtil.Exists('danlib/welcome_' .. GetHostName() .. '.txt')) then return end
-    if IsValid(MainFrame) then MainFrame:Remove() end
-    local pPlayer = LocalPlayer()
-    local step = 1
-
-    local tutorial = {
-        [1] = {
-            ['name'] = DanLib.Func:L('#tutorial.welcome', { player_name = pPlayer:Nick() }),
-            ['description'] = '{color: 220, 221, 225}I appreciate your use of my library and my addons! To avoid disturbing players, this notification will only appear once and will only be visible to the{/color:} {color: 255, 165, 0}Owner{/color:}{color: 220, 221, 225}.{/color:}',
-            ['back'] = 'Close',
-            ['next'] = 'Start',
+-- A SYSTEM FOR ADDING PARTICIPANTS
+local TEAM_MEMBERS = {
+    {
+        steamID = DanLib.Author,
+        role = 'Lead Developer',
+        roleColor = _Color(0, 151, 230),
+        gradientStart = _Color(255, 140, 0),
+        gradientEnd = _Color(0, 151, 230),
+        buttons = {
+            { color = _Color(88, 101, 242), text = 'Discord', link = 'https://discord.gg/CND6B5sH3j' },
+            { color = _Color(36, 41, 46), text = 'GitHub', link = 'https://github.com/denchik5133' },
+            { color = _Color(23, 121, 186), text = 'Steam', link = 'https://steamcommunity.com/profiles/76561198405398290/' },
+            { color = _Color(255, 69, 0), text = 'Youtube', lick = 'https://www.youtube.com/@denchik3506' }
         },
-        [2] = {
-            ['name'] = DanLib.Func:L('#tutorial.welcome.page1'),
-            ['description'] = '{color: 220, 221, 225}It is a library that extends the functionality of basic LUA functions. I plan to use it in my various developments, as I often use the same functions that I have to duplicate each time. To avoid this, I use a library that has everything I need to do a good job.{/color:}',
+    },
+    {
+        steamID = '76561199493672657',
+        role = 'Lead Developer',
+        roleColor = _Color(0, 151, 230),
+        gradientStart = _Color(27, 188, 242),
+        gradientEnd = _Color(251, 52, 114),
+        buttons = {
+            { color = _Color(23, 121, 186), text = 'Steam', link = 'https://steamcommunity.com/profiles/76561199493672657/' }
         },
-        [3] = {
-            ['name'] = DanLib.Func:L('#tutorial.welcome.page2'),
-            ['description'] = '{color: 220, 221, 225}There are many different useful features available at this time. A game configuration that provides ease of use. Modular system. Various vgui elements (pop-up windows, pop-up notifications, etc.). An admin system that helps with module management and helps sort out the players who can use a particular module. And much more...{/color:}'
-        },
-        [4] = {
-            ['name'] = DanLib.Func:L('#tutorial.welcome.page3'),
-            ['description'] = '{color: 220, 221, 225}To open the MENU, type the default command !danlibmenu in chat, to use via console, type the default command danlibmenu. To use all the features of DanLib, you need to have the rank Owner! Since only this rank has all privileges.{/color:}',
-            ['next'] = 'Start using',
-        },
-    }
-
-    MainFrame = DanLib.CustomUtils.Create()
-    Frame = MainFrame
-    Frame:SetSize(ScrW(), ScrH())
-    Frame:MakePopup() 
-    Frame:Center()
-    Frame:SetAlpha(0)
-    Frame:AlphaTo(255, 0.2)
-    Frame:ApplyBlur()
-    Frame:ApplyBackground(Color(14, 22, 33, 180))
-    Frame:ApplyText('Still in testing!!! ' .. DanLib.Func:L('#version', { version = DanLib.Version }), 'danlib_font_20', Frame:GetWide() - 20, Frame:GetTall() - 20, DanLib.Func:Theme('text'), TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
-
-    -- Seasonal effect
-    local currentMonth = os.date('!*t', os.time()).month
-    if (currentMonth == 12 or currentMonth == 1 or currentMonth == 2) then
-        DanLib.Func.CreateSnowPanel(Frame)
-    else
-        DanLib.Func.CreateLinePanel(Frame)
-    end
-
-    local base = DanLib.CustomUtils.Create(Frame)
-    base:SetSize(width, height)
-    base:Center()
-    base:SetAlpha(0)
-    base:AlphaTo(255, 0.2)
-    base:ApplyEvent(nil, function(sl, w, h)
-        local x, y = sl:LocalToScreen(0, 0)
-
-        DanLib.DrawShadow:Begin()
-        DanLib.Utils:DrawRoundedBox(x, y, w, h, DanLib.Func:Theme('background'))
-        DanLib.DrawShadow:End(1, 1, 1, 255, 0, 0, false)
-    end)
-
-    local function createButton(parent, name, color, clickCallback)
-        local Button = DanLib.Func.CreateUIButton(parent, {
-            background = {ColorAlpha(color, 20), 6},
-            dock_indent = {RIGHT, nil, 5, 5, 5},
-            wide = 125,
-            hover = {ColorAlpha(color, 60), nil, 6},
-            text = {name, 'danlib_font_22', nil, nil},
-            click = clickCallback
-        })
-        return Button
-    end
-
-    -- Function for displaying the current step of the tutorial
-    local function welcome()
-        local tuto = tutorial[step]
-        local container = DanLib.CustomUtils.Create(base)
-        container:Pin(FILL)
-
-        container.lerp = 0
-        container.alpha = 0
-
-        local con = DanLib.CustomUtils.Create(container)
-        con:Pin(FILL)
-        con:SetAlpha(0)
-        con:AlphaTo(255, 2)
-        con:ApplyEvent(nil, function(sl, w, h)
-            container.lerp = Lerp(FrameTime() * 2, container.lerp, 56)
-            container.alpha = Lerp(FrameTime() * 0.5, container.alpha, 150)
-
-            DanLib.Utils:DrawParseText(tutorial[step]['name'], 'danlib_font_36', 20, h * 0.05 + container.lerp, nil, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 500)
-            DanLib.Utils:DrawParseText(tutorial[step]['description'], 'danlib_font_24', w - 20, h * 0.7 - container.lerp, nil, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER, 400)
-        end)
-
-        local bottom = DanLib.CustomUtils.Create(container)
-        bottom:Pin(BOTTOM)
-        bottom:SetTall(40)
-
-        local buttons = {
-            {
-                name = tuto['next'] or 'Next',
-                color = Color(67, 156, 242),
-                callback = function()
-                    if tuto['Callback'] then tuto['Callback']() end
-                    if (step == #tutorial) then
-                        Frame:AlphaTo(0, 0.3, 0, function()
-                            Frame:Remove()
-                            step = 1
-                        end)
-                    else
-                        step = step + 1
-                        container:Clear()
-                        welcome()
-                    end
-                end
-            },
-            {
-                name = tuto['back'] or 'Back',
-                color = Color(209, 53, 62),
-                callback = function()
-                    if (step == 1) then
-                        Frame:AlphaTo(0, 0.3, 0, function() Frame:Remove() end)
-                    else
-                        step = step - 1
-                        container:Clear()
-                        welcome()
-                    end
-                end
-            }
+    },
+    {
+        steamID = '76561198000000000',
+        role = 'Tester',
+        roleColor = _Color(76, 175, 80),
+        gradientStart = _Color(76, 175, 80),
+        gradientEnd = _Color(67, 156, 242),
+        buttons = {
+            { color = _Color(23, 121, 186), text = 'Steam', link = 'https://steamcommunity.com/profiles/76561198000000000/' }
         }
+    }
+}
 
-        for _, btn in ipairs(buttons) do
-            createButton(bottom, btn.name, btn.color, btn.callback)
+
+local VERSION_CHECK_CACHE = {
+    latestVersion = nil,
+    lastCheckTime = 0,
+    isChecking = false,
+    CACHE_TTL = 300 -- 5 minutes
+}
+
+--- Checks the relevance of the cached version of DanLib
+-- @param callback function: The callback function with the result (latestVersion, isUpToDate, isChecking)
+local function _checkVersion(callback)
+    local currentTime = CurTime()
+    local updateLink = 'https://raw.githubusercontent.com/denchik5133/DDI-Other-Informations/main/DDI/update.json'
+    
+    -- If the cache is valid, we return the cached data.
+    if VERSION_CHECK_CACHE.latestVersion and (currentTime - VERSION_CHECK_CACHE.lastCheckTime < VERSION_CHECK_CACHE.CACHE_TTL) then
+        local currentVer = DanLib.Version or '3.0.0'
+        local isUpToDate = (currentVer == VERSION_CHECK_CACHE.latestVersion)
+        callback(VERSION_CHECK_CACHE.latestVersion, isUpToDate, false)
+        return
+    end
+    
+    -- If the check is already underway, we are waiting
+    if VERSION_CHECK_CACHE.isChecking then
+        callback(nil, nil, true)
+        return
+    end
+    
+    -- Starting the verification process
+    VERSION_CHECK_CACHE.isChecking = true
+    callback(nil, nil, true) -- We immediately return "verified"
+    
+    DanLib.HTTP:Fetch(updateLink, function(data)
+        local versions = DanLib.NetworkUtil:JSONToTable(data)
+        if (versions and versions[DanLib.AddonsName]) then
+            VERSION_CHECK_CACHE.latestVersion = versions[DanLib.AddonsName]
+            VERSION_CHECK_CACHE.lastCheckTime = currentTime
+            VERSION_CHECK_CACHE.isChecking = false
+            
+            local currentVer = DanLib.Version or '3.0.0'
+            local isUpToDate = (currentVer == VERSION_CHECK_CACHE.latestVersion)
+            callback(VERSION_CHECK_CACHE.latestVersion, isUpToDate, false)
+        else
+            VERSION_CHECK_CACHE.isChecking = false
+            callback(nil, nil, false)
+        end
+    end, function(err)
+        print('[DanLib Welcome] Failed to fetch version:', err or 'Unknown error')
+        VERSION_CHECK_CACHE.isChecking = false
+        callback(nil, nil, false)
+    end)
+end
+
+-- GLOBAL VARIABLES
+local currentWidth = DBase:GetSize(POPUP_WIDTH)
+local currentHeight = DBase:GetSize(POPUP_HEIGHT)
+
+local function UpdateScreenSize()
+    currentWidth = DBase:GetSize(POPUP_WIDTH)
+    currentHeight = DBase:GetSize(POPUP_HEIGHT)
+end
+DHook:Add('OnScreenSizeChanged', 'DanLib.WelcomeResize', UpdateScreenSize)
+
+--- THE FILE SYSTEM
+local function GetSafeHostname()
+    local hostname = _GetHostName()
+    local safeName = hostname:gsub('[^%w%s%-_]', ''):gsub('%s+', '_'):lower()
+
+    if (#safeName > 64) then
+        safeName = safeName:sub(1, 64)
+    end
+
+    if (safeName == '') then
+        safeName = 'server_' .. util.CRC(hostname)
+    end
+
+    return safeName
+end
+
+local function _getWelcomeFileName()
+    return 'danlib/welcome_' .. GetSafeHostname() .. '.txt'
+end
+
+local function _wasTutorialShown()
+    local welcomeFile = _getWelcomeFileName()
+    if (not DFileUtil.Exists(welcomeFile)) then
+        return false
+    end
+
+    local content = DFileUtil.Read(welcomeFile) or ''
+    if (not content:find(_GetHostName(), 1, true)) then
+        return false
+    end
+
+    return true
+end
+
+local function _saveWelcomeFlag(completed)
+    local welcomeFile = _getWelcomeFileName()
+    local currentLang = DanLib.CONFIG.BASE.Languages or 'English'
+    local content = string.format('Server: %s\nTimestamp: %s\nCompleted: %s\nVersion: %s\nLanguage: %s', _GetHostName(), os.date('%Y-%m-%d %H:%M:%S'), completed and 'Yes' or 'Skipped', DanLib.Version or '3.1.0', currentLang)
+    DFileUtil.Write(welcomeFile, content)
+    print('[DanLib] Tutorial ' .. (completed and 'completed' or 'skipped'))
+end
+
+--- TUTORIAL STEPS
+local TUTORIAL_STEPS = {
+    { -- STEP 1: Welcome
+        title = 'Welcome {color:255,165,0}{player_name}{/color}!',
+        lines = {
+            { text = 'You are now the Owner of this DanLib installation.' },
+            { text = '' },
+            { text = 'This interactive guide will help you:' },
+            { text = '' },
+            { text = '{color:67,156,242}Configure Settings{/color:}' },
+            { text = '  • Choose your preferred language' },
+            { text = '  • Select a theme and gamemode' },
+            { text = '' },
+            { text = '{color:67,156,242}Learn Essential Features{/color:}' },
+            { text = '  • Understand your Owner privileges' },
+            { text = '  • Navigate the control panel' },
+            { text = '' },
+            { text = '{color:113, 128, 147}Time required: ~3 minutes{/color:}' }
+        },
+        buttons = { back = 'Skip Tutorial', next = 'Let\'s Start' }
+    },
+    { -- STEP 2: About Authors
+        title = 'Meet the {color:76,175,80}Development Team{/color}',
+        lines = {
+            { text = 'DanLib is developed and maintained by DDI Scripts:' },
+            { text = '' },
+            { text = '{color:113, 128, 147}Connect with us for support, updates, and community!{/color:}' }
+        },
+        animation = false,
+        interactive = function(parent, settings)
+            -- VERSION VERIFICATION PANEL
+            local versionPanel = DCustomUtils(parent)
+            versionPanel:PinMargin(TOP, nil, nil, nil, 8)
+            versionPanel:SetTall(80)
+            versionPanel.alpha = 0
+            versionPanel.latestVersion = nil
+            versionPanel.isUpToDate = nil
+            versionPanel.isChecking = true
+
+            -- CALLING THE CACHING FUNCTION
+            _checkVersion(function(latestVersion, isUpToDate, isChecking)
+                if (not _IsValid(versionPanel)) then 
+                    return
+                end
+
+                versionPanel.latestVersion = latestVersion
+                versionPanel.isUpToDate = isUpToDate
+                versionPanel.isChecking = isChecking
+            end)
+            
+            versionPanel:ApplyEvent(nil, function(sl, w, h)
+                sl.alpha = _Lerp(_FrameTime() * ANIM_SPEED, sl.alpha, 255)
+                DUtils:DrawRoundedBox(0, 0, w, h, _Color(32, 42, 58, sl.alpha))
+                
+                local leftX = 15
+                local rightX = w - 15
+                
+                -- Name and version
+                local line1Y = 8
+                _drawSimpleText(DanLib.AddonsName or 'DanLib Basic Library', 'danlib_font_18', leftX, line1Y, DBase:Theme('title', sl.alpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+                local currentVersion = 'v' .. (DanLib.Version or '3.0.0')
+                _drawSimpleText(currentVersion, 'danlib_font_18', rightX, line1Y, _ColorAlpha(DTheme['Blue'], sl.alpha), TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
+
+                -- Author and release date
+                local line2Y = 32
+                _drawSimpleText('Released', 'danlib_font_18', leftX, line2Y, _Color(113, 128, 147, sl.alpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+                _drawSimpleText(DanLib.ReleaseDate or '10/4/2023', 'danlib_font_18', rightX, line2Y, _Color(113, 128, 147, sl.alpha), TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
+                
+                -- Version status
+                local line3Y = 56
+                _drawSimpleText('by DDI Scripts', 'danlib_font_18', leftX, line3Y, _Color(113, 128, 147, sl.alpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+
+                if sl.isChecking then
+                    _drawSimpleText('Checking for updates...', 'danlib_font_18', rightX, line3Y, _Color(255, 165, 0, sl.alpha), TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
+                elseif sl.latestVersion then
+                    if sl.isUpToDate then
+                        _drawSimpleText('✓ Up to date', 'danlib_font_18', rightX, line3Y, _ColorAlpha(DTheme['Green'], sl.alpha), TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
+                    else
+                        _drawSimpleText('Update available: v' .. sl.latestVersion, 'danlib_font_18', rightX, line3Y, _ColorAlpha(DTheme['DarkOrange'], sl.alpha), TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
+                    end
+                else
+                    _drawSimpleText('Unable to check for updates', 'danlib_font_18', rightX, line3Y, _Color(180, 180, 180, sl.alpha), TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
+                end
+            end)
+
+            local matCircle = Material('vgui/circle')
+            -- A FUNCTION FOR CREATING A PARTICIPANT CARD
+            local function CreateMemberCard(memberData)
+                local avatarSize = 80
+                local ID = memberData.steamID
+                local playerName = steamworks.GetPlayerName(ID) or 'Unknown'
+                
+                local devCard = DCustomUtils(parent)
+                devCard:PinMargin(TOP, nil, nil, nil, 12)
+                devCard:SetTall(150)
+                devCard.alpha = 0
+                devCard.hoverAlpha = 0
+                
+                devCard:ApplyEvent(nil, function(sl, w, h)
+                    -- Animation of appearance
+                    sl.alpha = _Lerp(_FrameTime() * ANIM_SPEED, sl.alpha, 255)
+                    
+                    -- Hover effect
+                    if sl:IsHovered() then
+                        sl.hoverAlpha = _Lerp(_FrameTime() * 8, sl.hoverAlpha, 10)
+                    else
+                        sl.hoverAlpha = _Lerp(_FrameTime() * 8, sl.hoverAlpha, 0)
+                    end
+                    
+                    DUtils:DrawRoundedMask(6, 0, 0, w, h, function()
+                        DUtils:DrawRoundedBox(0, 0, w, h, _Color(32, 42, 58, sl.alpha))
+                        
+                        -- Hover illumination
+                        if (sl.hoverAlpha > 0) then
+                            DUtils:DrawRoundedBox(0, 0, w, h, _ColorAlpha(memberData.roleColor, sl.hoverAlpha))
+                        end
+                        
+                        -- The upper gradient
+                        DUtils:DrawGradientBox(0, 0, 0, w, 50, 0, _ColorAlpha(memberData.gradientStart, sl.alpha), _ColorAlpha(memberData.gradientEnd, sl.alpha))
+                        -- Avatar (background)
+                        DUtils:DrawMaterial(20, 16, avatarSize, avatarSize, _Color(32, 42, 58, sl.alpha), matCircle)
+                        
+                        -- Name
+                        local nameY = 20 + avatarSize + 8
+                        _drawSimpleText(playerName, 'danlib_font_20', 25, nameY,  DBase:Theme('text', sl.alpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                        
+                        local badgeY = nameY + 16
+                        local text_w = DUtils:TextSize(memberData.role, 'danlib_font_18').w
+                        local badgeW = text_w + 10
+                        local badgeH = 18
+                        -- The shadow under the badge
+                        DUtils:DrawRoundedBox(22, badgeY + 1, badgeW, badgeH,  _Color(0, 0, 0, sl.alpha * 0.3))
+                        -- Badge
+                        DUtils:DrawRoundedBox(20, badgeY, badgeW, badgeH, _ColorAlpha(memberData.roleColor, sl.alpha * 0.8))
+                        _drawSimpleText(memberData.role, 'danlib_font_18', 25, badgeY + badgeH / 2, DBase:Theme('title', sl.alpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                    end)
+                end)
+                
+                -- Avatar
+                local avatar = DCustomUtils(devCard)
+                avatar:ApplyAvatar(false, 40)
+                avatar:SetSteamID(ID, 124)
+                avatar:SetPos(25, 22)
+                avatar:SetSize(avatarSize - 10, avatarSize - 10)
+                
+                local buttonSpacing = 6
+                local buttonStartX = 25 + avatarSize + 15
+                local buttonStartY = 60
+                local buttonHeight = 28
+                local rowSpacing = 4
+                
+                -- Getting the actual width of the parent
+                DBase:TimerSimple(0, function()
+                    if (not _IsValid(devCard)) then
+                        return
+                    end
+                    
+                    local parentWidth = parent:GetWide()
+                    local cardPadding = 20
+                    
+                    -- Maximum width = width of the parent - margins - starting position - right margin
+                    local maxWidth = parentWidth - buttonStartX - 15
+                    local currentX = 0
+                    local currentY = buttonStartY
+                    
+                    for i, btnData in _ipairs(memberData.buttons or { }) do
+                        local buttonTextWidth = DUtils:TextSize(btnData.text, 'danlib_font_18').w
+                        local buttonWidth = 10 + buttonTextWidth
+                        
+                        -- Checking whether the button will fit in the current row.
+                        if (currentX > 0 and (currentX + buttonWidth) > maxWidth) then
+                            -- Switching to a new line
+                            currentX = 0
+                            currentY = currentY + buttonHeight + rowSpacing
+                        end
+                        
+                        -- Creating a button
+                        DBase.CreateUIButton(devCard, {
+                            pos = { buttonStartX + currentX, currentY },
+                            size = { buttonWidth, buttonHeight },
+                            text = { btnData.text, 'danlib_font_18' },
+                            sound = false,
+                            background = { DBase:Theme('secondary_dark') },
+                            hover = { btnData.color, 6 },
+                            paint = function(sl, w, h)
+                                local x, y = sl:LocalToScreen(0, 0)
+                                DOutline:Draw(6, x, y, w, h, DBase:Theme('frame'), nil, 1)
+                            end,
+                            click = function()
+                                local context = DBase:UIContextMenu()
+                                context:Option('Copy', nil, nil, function()
+                                    DBase:ClipboardText(btnData.link)
+                                end)
+                                context:Option('Open', nil, nil, function()
+                                    gui.OpenURL(btnData.link)
+                                end)
+                                context:Open()
+                            end
+                        })
+                        
+                        -- Updating the position for the next button
+                        currentX = currentX + buttonWidth + buttonSpacing
+                    end
+                    
+                    local requiredHeight = currentY + buttonHeight + 15
+                    if (requiredHeight > devCard:GetTall()) then
+                        devCard:SetTall(requiredHeight)
+                    end
+                end)
+                
+                return devCard
+            end
+            
+            -- WE CREATE CARDS FOR ALL PARTICIPANTS
+            for _, memberData in _ipairs(TEAM_MEMBERS) do
+                CreateMemberCard(memberData)
+            end
+
+            -- AUTOMATIC HEIGHT CALCULATION AFTER ALL ELEMENTS ARE CREATED
+            DBase:TimerSimple(0, function()
+                if (not _IsValid(parent)) then
+                    return
+                end
+                
+                local totalHeight = 0
+                for _, child in _ipairs(parent:GetChildren()) do
+                    if _IsValid(child) then
+                        totalHeight = totalHeight + child:GetTall() + 12
+                    end
+                end
+                
+                parent:SetTall(totalHeight)
+            end)
+        end,
+        buttons = { back = 'Back', next = 'Next' }
+    },
+    { -- STEP 3: Language Selection
+    title = 'Choose Your {color:67,156,242}Language{/color:}',
+    lines = {
+        { text = 'Select the interface language:' },
+        { text = '' },
+        { text = '{color:113, 128, 147}Translation quality shown for each language.{/color:}' },
+        { text = '{color:113, 128, 147}You can change this later in Settings > DanLib Basic Library.{/color:}' }
+    },
+        animation = false,
+        interactive = function(parent, settings)
+            local langCombo = DBase.CreateUIComboBox(parent)
+            langCombo:Pin(TOP)
+            langCombo:SetTall(30)
+            
+            local currentLang = DanLib.CONFIG.BASE.Languages or 'English'
+            -- The basic language for comparison
+            local baseLang = DanLib.Temp.Languages[currentLang] or DanLib.Temp.Languages['English']
+            local baseCount = DTable:Count(baseLang)
+            
+            -- Sorting by transfer percentage
+            local sortedLangs = {}
+            for langID, langData in _pairs(DanLib.Temp.Languages or {}) do
+                local delta = baseCount - DTable:Count(langData)
+                local inverted = baseCount - delta
+                local percentage = _mathRound(inverted / baseCount * 100, 2)
+                
+                DTable:Add(sortedLangs, {
+                    id = langID,
+                    data = langData,
+                    percentage = percentage
+                })
+            end
+            
+            -- We sort the percentage in descending order
+            DTable:Sort(sortedLangs, function(a, b)
+                return a.percentage > b.percentage
+            end)
+            
+            for _, lang in _ipairs(sortedLangs) do
+                local isSelected = (currentLang == lang.id)
+                local percentage = lang.percentage
+                local displayName = string.format('%s, translated %s%%', lang.id, percentage)
+                langCombo:AddChoice(displayName, lang.id, isSelected)
+            end
+            
+            langCombo:ApplyEvent('OnSelect', function(_, index, value, data)
+                settings.language = data
+            end)
+        end,
+        buttons = { back = 'Back', next = 'Next' }
+    },
+    { -- STEP 4: Theme Selection
+        title = 'Select a {color:67,156,242}Theme{/color:}',
+        lines = {
+            { text = 'Choose a color scheme for the interface:' },
+            { text = '' },
+            { text = '{color:67,156,242}Themes customize:{/color:}' },
+            { text = '  • Background colors' },
+            { text = '  • Accent colors and highlights' },
+            { text = '  • Button and panel styles' },
+            { text = '' },
+            { text = '{color:113, 128, 147}Change anytime in Settings > DanLib Basic Library > Themes.{/color:}' }
+        },
+        interactive = function(parent, settings)
+            local themeCombo = DBase.CreateUIComboBox(parent)
+            themeCombo:Pin(TOP)
+            themeCombo:SetTall(30)
+            
+            local currentTheme = DanLib.CONFIG.BASE.Themes or 'DarkTheme'
+            for themeID, themeData in _pairs(DanLib.Temp.Themes or {}) do
+                local isSelected = (currentTheme == themeID)
+                local displayName = themeData.Name or themeID
+                themeCombo:AddChoice(displayName, themeID, isSelected)
+            end
+            
+            themeCombo:ApplyEvent('OnSelect', function(_, index, value, data)
+                settings.theme = data
+            end)
+        end,
+        buttons = { back = 'Back', next = 'Next' }
+    },
+    { -- STEP 5: Gamemode Configuration
+        title = 'Configure {color:255,165,0}Gamemode{/color:}',
+        lines = {
+            { text = 'Select your server\'s gamemode integration:' },
+            { text = '' },
+            { text = '{color:67,156,242}This affects:{/color:}' },
+            { text = '  • Economy system integration' },
+            { text = '  • Player money handling' },
+            { text = '  • Gamemode-specific features' },
+            { text = '' },
+            { text = '{color:113, 128, 147}DanLib will adapt to your server\'s gamemode automatically.{/color:}' },
+            { text = '{color:113, 128, 147}Change in Settings > DanLib Basic Library > Gamemode.{/color:}' }
+        },
+        interactive = function(parent, settings)
+            local modeCombo = DBase.CreateUIComboBox(parent)
+            modeCombo:Pin(TOP)
+            modeCombo:SetTall(30)
+            
+            local currentMode = DanLib.CONFIG.BASE.Gamemode or 'blank'
+            for modeID, modeData in pairs(DanLib.Temp.Gamemodes or {}) do
+                local isSelected = (currentMode == modeID)
+                modeCombo:AddChoice(modeData.Name or modeID, modeID, isSelected)
+            end
+            
+            -- Panel with description
+            local descPanel = DCustomUtils(parent)
+            descPanel:PinMargin(TOP, nil, 10, nil, 10)
+            descPanel:SetTall(60)
+            descPanel:ApplyAttenuation(0.5, 255)
+            descPanel.currentHeight = 60
+            
+            descPanel:ApplyEvent(nil, function(sl, w, h)
+                DUtils:DrawRoundedBox(0, 0, w, h, _Color(30, 40, 55, 150))
+                
+                -- We get the selected mode
+                local selectedMode = settings.gamemode or currentMode
+                local modeData = DanLib.Temp.Gamemodes[selectedMode]
+                
+                -- We take the description
+                local desc = 'No description available'
+                if (modeData and modeData.Description) then
+                    desc = modeData.Description
+                end
+                
+                -- Calculating the required height for the text
+                local padding = 20
+                local wrappedText = DUtils:TextWrap(desc, 'danlib_font_18', w - 20, true)
+                local lineCount = _select(2, wrappedText:gsub('\n', '\n')) + 1
+                local lineHeight = DUtils:TextSize('A', 'danlib_font_18').h
+                local requiredHeight = (lineCount * lineHeight) + padding
+                
+                -- Smooth height change
+                sl.currentHeight = _Lerp(_FrameTime() * 5, sl.currentHeight, requiredHeight)
+                
+                -- Updating the actual height of the panel
+                if (_mathAbs(sl.currentHeight - sl:GetTall()) > 1) then
+                    sl:SetTall(_mathCeil(sl.currentHeight))
+                    -- Updating the height of the parent
+                    if _IsValid(parent) then
+                        parent:InvalidateLayout(true)
+                    end
+                end
+                
+                -- Drawing the text
+                _drawDrawText(wrappedText, 'danlib_font_18', 10, 10, _Color(180, 190, 200), TEXT_ALIGN_LEFT)
+            end)
+            
+            -- We update the description when the descPanel mode
+            modeCombo:ApplyEvent('OnSelect', function(_, index, value, data)
+                settings.gamemode = data
+            end)
+            
+            -- AUTOMATIC CALCULATION OF CONTAINER HEIGHT
+            DBase:TimerSimple(0.1, function()
+                if (not _IsValid(parent)) then
+                    return
+                end
+                
+                local totalHeight = 0
+                for _, child in _ipairs(parent:GetChildren()) do
+                    if _IsValid(child) then
+                        totalHeight = totalHeight + child:GetTall() + 10
+                    end
+                end
+                
+                parent:SetTall(totalHeight + 20)
+            end)
+        end,
+        buttons = { back = 'Back', next = 'Next' }
+    },
+    { -- STEP 6: Owner Privileges
+        title = 'Your {color:76,175,80}Owner Privileges{/color:}',
+        lines = {
+            { text = 'As the Owner, you have unrestricted access to:' },
+            { text = '' },
+            { text = '{color:67,156,242}Full Module Control{/color:}' },
+            { text = '  • Enable or disable any feature in Modules' },
+            { text = '  • Configure all settings without restrictions' },
+            { text = '' },
+            { text = '{color:67,156,242}Rank Management{/color:}' },
+            { text = '  • Create custom ranks with specific permissions' },
+            { text = '  • Assign ranks to players' },
+            { text = '' },
+            { text = '{color:67,156,242}System Configuration{/color:}' },
+            { text = '  • Modify all library settings' },
+            { text = '  • Customize UI themes and interface elements' },
+            { text = '' },
+            { text = '{color:113, 128, 147}Your Owner rank is protected and cannot be removed by others.{/color:}' }
+        },
+        buttons = { back = 'Back', next = 'Next' }
+    },
+    { -- STEP 7: Control Panel Navigation
+        title = 'The {color:67,156,242}Control Panel{/color:}',
+        lines = {
+            { text = 'The DanLib menu has 6 main sections:' },
+            { text = '' },
+            { text = '{color:67,156,242}Dashboard{/color:} - Server overview and statistics' },
+            { text = '  (Currently showing {color:251,197,49}TOOLGAN{/color:} hologram)' },
+            { text = '' },
+            { text = '{color:67,156,242}User{/color:} - Personal settings for individual players' },
+            { text = '  Each player can customize their own preferences' },
+            { text = '' },
+            { text = '{color:67,156,242}Commands{/color:} - All registered chat commands' },
+            { text = '  View and search available commands' },
+            { text = '' },
+            { text = '{color:67,156,242}Modules{/color:} - Enable/disable registered modules' },
+            { text = '  Control which features are active' },
+            { text = '' },
+            { text = '{color:67,156,242}Settings{/color:} - Configure modules and DanLib' },
+            { text = '  Customize all library and module options' },
+            { text = '' },
+            { text = '{color:67,156,242}Help{/color:} - Documentation, Discord, and Tutorial' },
+            { text = '  Get support and restart this guide anytime' },
+        },
+        buttons = { back = 'Back', next = 'Next' }
+    },
+    { -- STEP 8: More Menu Sections
+        title = 'Control Panel {color:255,165,0}Continued{/color:}',
+        lines = {
+            { text = 'Additional menu sections:' },
+            { text = '' },
+            { text = '{color:67,156,242}Settings{/color:} - Configure modules and DanLib' },
+            { text = '  • Adjust language, theme, gamemode' },
+            { text = '  • Configure chat commands and currency' },
+            { text = '  • Set up module-specific options' },
+            { text = '  • Manage NPC, Ranks, Logs, and SQL settings' },
+            { text = '' },
+            { text = '{color:67,156,242}Help{/color:} - Get support and resources' },
+            { text = '  • {color:255,140,0}Documentation{/color:} - Opens DDI Documentation website' },
+            { text = '  • {color:255,140,0}Discord{/color:} - Join DDI Scripts Discord server' },
+            { text = '  • {color:255,140,0}Tutorial{/color:} - Restart this tutorial anytime' },
+            { text = '' },
+            { text = '{color:113, 128, 147}Access the menu anytime with {color:0,255,0}!danlibmenu{/color:} in chat{/color:}' },
+            { text = '{color:113, 128, 147}or {color:0,255,0}danlibmenu{/color:} in console.{/color:}' }
+        },
+        buttons = { back = 'Back', next = 'Next' }
+    },
+    { -- STEP 9: Confirm Settings
+        title = '{color:76,175,80}Confirm{/color:} Your Settings',
+        lines = {
+            { text = 'Review your configuration below:' },
+            { text = '' },
+            { text = '{color:67,156,242}What Happens Next:{/color:}' },
+            { text = '  • Your settings will be saved to the server' },
+            { text = '  • Interface will update with your chosen theme' },
+            { text = '  • Language will change immediately' },
+            { text = '  • You can modify these anytime in Settings' },
+            { text = '' },
+            { text = '{color:113, 128, 147}Click "Apply & Finish" to save and complete setup.{/color:}' },
+            { text = '{color:113, 128, 147}Click "Back" to change any settings.{/color:}' }
+        },
+        review = function(parent, settings)
+            local reviewPanel = DCustomUtils(parent)
+            reviewPanel:PinMargin(TOP, nil, 20)
+            reviewPanel:SetTall(120)
+            reviewPanel.alpha = 0
+            reviewPanel:ApplyEvent(nil, function(sl, w, h)
+                sl.alpha = _Lerp(_FrameTime() * ANIM_SPEED, sl.alpha, 255)
+                _drawSimpleText('Selected Configuration:', 'danlib_font_20', 10, 5, _ColorAlpha(DBase:Theme('title'), sl.alpha), TEXT_ALIGN_LEFT)
+                
+                local y = 35
+                local spacing = 28
+                local labelX = 20
+                local valueX = 180
+                
+                -- Language
+                local langText = settings.language or DanLib.CONFIG.BASE.Languages or 'English'
+                _drawSimpleText('Language:', 'danlib_font_18', labelX, y, _ColorAlpha(DTheme['Blue'], sl.alpha), TEXT_ALIGN_LEFT)
+                _drawSimpleText(langText, 'danlib_font_18', valueX, y, _ColorAlpha(DTheme['Green'], sl.alpha), TEXT_ALIGN_LEFT)
+                y = y + spacing
+                
+                -- Theme
+                local themeText = settings.theme or DanLib.CONFIG.BASE.Themes or 'Default'
+                _drawSimpleText('Theme:', 'danlib_font_18', labelX, y, _ColorAlpha(DTheme['Blue'], sl.alpha), TEXT_ALIGN_LEFT)
+                _drawSimpleText(themeText, 'danlib_font_18', valueX, y, _ColorAlpha(DTheme['Green'], sl.alpha), TEXT_ALIGN_LEFT)
+                y = y + spacing
+                
+                -- Gamemode
+                local modeText = settings.gamemode or DanLib.CONFIG.BASE.Gamemode or 'Blank'
+                _drawSimpleText('Gamemode:', 'danlib_font_18', labelX, y, _ColorAlpha(DTheme['Blue'], sl.alpha), TEXT_ALIGN_LEFT)
+                _drawSimpleText(modeText, 'danlib_font_18', valueX, y, _ColorAlpha(DTheme['Green'], sl.alpha), TEXT_ALIGN_LEFT)
+            end)
+        end,
+        buttons = { back = 'Back', next = 'Apply & Finish' }
+    }
+}
+
+-- UI COMPONENTS
+local function CreateButton(parent, text, color, onClick)
+    local btn = DBase.CreateUIButton(parent, {
+        background = { _ColorAlpha(color, 10), 6 },
+        dock_indent = { RIGHT, nil, 5, 5, 5 },
+        wide = 150,
+        hover = { _ColorAlpha(color, 60), nil, 6 },
+        text = { text, 'danlib_font_20', nil, nil },
+        click = onClick
+    })
+    return btn
+end
+
+-- MAIN FUNCTION
+local function RenderTutorialStep(container, stepIndex, onNext, onBack, settings)
+    local step = TUTORIAL_STEPS[stepIndex]
+    local pPlayer = _LocalPlayer()
+    local title = step.title:gsub('{player_name}', pPlayer:Nick())
+    
+    container:Clear()
+    
+    -- Heading
+    local header = DCustomUtils(container)
+    header:SetTall(50)
+    header:PinMargin(TOP, nil, nil, nil, 10)
+    header.alpha = 0
+    header:ApplyEvent(nil, function(sl, w, h)
+        sl.alpha = _Lerp(_FrameTime() * ANIM_SPEED, sl.alpha, 255)
+        DUtils:DrawParseText(title, 'danlib_font_26', 0, h / 2, _ColorAlpha(COLOR_TEXT, sl.alpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 500, TEXT_ALIGN_LEFT)
+    end)
+    
+    -- Separator
+    local sep1 = DCustomUtils(container)
+    sep1:SetTall(1)
+    sep1:PinMargin(TOP, nil, nil, nil, 12)
+    sep1:ApplyEvent(nil, function(sl, w, h)
+        DUtils:DrawGradient(0, 0, w, h, LEFT, COLOR_SEPARATOR)
+    end)
+    
+    -- SCROLL PANEL
+    local scrollPanel = DCustomUtils(container, 'DanLib.UI.Scroll')
+    scrollPanel:PinMargin(nil, nil, nil, nil, 12)
+    scrollPanel:ToggleScrollBar()
+    
+    -- Text strings
+    if step.lines then
+        for i, lineData in _ipairs(step.lines) do
+            if (lineData.text == '') then
+                local spacer = DCustomUtils(scrollPanel)
+                spacer:Pin(TOP)
+                spacer:SetTall(8)
+            else
+                local linePanel = DCustomUtils(scrollPanel)
+                linePanel:Pin(TOP)
+                linePanel:SetTall(22)
+                linePanel.alpha = 0
+                linePanel.delay = i * 0.03
+                linePanel:ApplyEvent(nil, function(sl, w, h)
+                    if (sl.delay > 0) then
+                        sl.delay = sl.delay - _FrameTime()
+                    else
+                        sl.alpha = _Lerp(_FrameTime() * ANIM_SPEED, sl.alpha, 255)
+                    end
+                    DUtils:DrawParseText(lineData.text, 'danlib_font_18', 5, h / 2, DBase:Theme('text', sl.alpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 500, TEXT_ALIGN_LEFT)
+                end)
+            end
         end
     end
-
-    welcome()
-
-    local File = 'danlib/welcome_' .. GetHostName() .. '.txt'
-    local Content = 'This is an indicator that you have already seen the Thank you screen. Please don\'t delete this file.'
-    DanLib.FileUtil.Write(File, Content)
+    
+    -- Interactive elements
+    if step.interactive then
+        local animation = step.animation
+        
+        local interactiveContainer = DCustomUtils(scrollPanel)
+        interactiveContainer:PinMargin(TOP, nil, 10, nil, 15)
+        
+        -- If there is a fixed height, we use it.
+        if step.interactiveHeight then
+            interactiveContainer:SetTall(step.interactiveHeight)
+        elseif step.getInteractiveHeight then
+            interactiveContainer:SetTall(step.getInteractiveHeight())
+        else
+            -- Otherwise, we start with the minimum height, which will automatically change.
+            interactiveContainer:SetTall(100)
+        end
+        
+        if (animation ~= false) then
+            interactiveContainer:ApplyAttenuation(1.1, 255)
+        end
+        
+        step.interactive(interactiveContainer, settings)
+    end
+    
+    -- Review element
+    if step.review then
+        step.review(scrollPanel, settings)
+    end
+    
+    -- Buttons
+    local buttonPanel = DCustomUtils(container)
+    buttonPanel:Pin(BOTTOM)
+    buttonPanel:SetTall(40)
+    
+    CreateButton(buttonPanel, step.buttons.next, DTheme['Blue'], onNext)
+    CreateButton(buttonPanel, step.buttons.back, DTheme['Red'], onBack)
 end
 
--- DanLib.PopupWelcome()
+
+local function ApplySeasonalEffect(frame)
+    local month = _osDate('!*t', _osTime()).month
+    if (month == 12 or month == 1 or month == 2) then
+        DBase.CreateSnowPanel(frame)
+    else
+        DBase.CreateLinePanel(frame)
+    end
+end
+
+-- A function for saving all settings to the server
+local function SaveAllSettings(settings)
+    local toSave = {}
+    
+    if settings.language then
+        toSave.BASE = toSave.BASE or {}
+        toSave.BASE.Languages = settings.language
+    end
+    
+    if settings.theme then
+        toSave.BASE = toSave.BASE or {}
+        toSave.BASE.Themes = settings.theme
+    end
+    
+    if settings.gamemode then
+        toSave.BASE = toSave.BASE or {}
+        toSave.BASE.Gamemode = settings.gamemode
+    end
+    
+    DBase:SaveSettings(toSave, true) -- skipHookUpdate = true
+end
+
+-- THE MAIN FUNCTION OF OPENING THE TUTORIAL
+function DanLib.PopupWelcome()
+    if _wasTutorialShown() then
+        print('[DanLib] Tutorial already shown on: ' .. _GetHostName())
+        return
+    end
+    
+    if _IsValid(DanLib.WelcomeFrame) then
+        DanLib.WelcomeFrame:Remove()
+    end
+    
+    local currentStep = 1
+    -- INITIALIZE THE SETTINGS WITH DEFAULT VALUES
+    local userSettings = {
+        -- We get the current values from the config as default values
+        language = DanLib.CONFIG.BASE.Languages or 'English',
+        theme = DanLib.CONFIG.BASE.Themes or 'Default',
+        gamemode = DanLib.CONFIG.BASE.Gamemode or 'DarkRP'
+    }
+    
+    -- The main frame
+    local MainFrame = DCustomUtils()
+    MainFrame:SetSize(ScrW(), ScrH())
+    MainFrame:MakePopup()
+    MainFrame:ApplyBlur()
+    MainFrame:ApplyAttenuation()
+    MainFrame:ApplyBackground(COLOR_BG)
+    DanLib.WelcomeFrame = MainFrame
+
+    ApplySeasonalEffect(MainFrame)
+    
+    -- The basic panel
+    local basePanel = DCustomUtils(MainFrame)
+    basePanel:SetSize(currentWidth, currentHeight)
+    basePanel:Center()
+    basePanel:ApplyEvent(nil, function(sl, w, h)
+        local x, y = sl:LocalToScreen(0, 0)
+        DanLib.DrawShadow:Begin()
+        DUtils:DrawRoundedBox(x, y, w, h, DBase:Theme('background'))
+        DanLib.DrawShadow:End(1, 1, 1, 255, 0, 0, false)
+    end)
+    
+    -- Content container
+    local contentContainer = DCustomUtils(basePanel)
+    contentContainer:PinMargin(nil, 30, 25, 30, 20)
+
+    local function ShowCurrentStep()
+        RenderTutorialStep(contentContainer, currentStep, function() --[[ Next ]]
+            if (currentStep == #TUTORIAL_STEPS) then
+                SaveAllSettings(userSettings)
+                MainFrame:Remove()
+                _saveWelcomeFlag(true)
+            else
+                currentStep = currentStep + 1
+                ShowCurrentStep()
+            end
+        end, function() --[[ Back/Skip ]]
+            if (currentStep == 1) then
+                MainFrame:Remove()
+                _saveWelcomeFlag(false)
+            else
+                currentStep = currentStep - 1
+                ShowCurrentStep()
+            end
+        end, userSettings)
+    end
+    
+    ShowCurrentStep()
+end
