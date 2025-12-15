@@ -33,6 +33,7 @@ local _mathClamp = math.Clamp
 local _stringFormat = string.format
 local _drawSimpleText = draw.SimpleText
 local _stringGsub = string.gsub
+local _stringFind = string.find
 local _drawRoundedBox = draw.RoundedBox
 local _colorWhite = _Color(255, 255, 255)
 local _colorGray = _Color(130, 130, 130)
@@ -426,14 +427,25 @@ function DEBUG:UpdateGroupedLogs()
     -- Error handling
     for i = #processedErrors + 1, #self.errors do
         local err = self.errors[i]
+        
+        -- Checking the realm
+        local realm = err.realm or 'CLIENT'
+        local errorText = err.error or 'Unknown error'
+        
+        -- Adding [SERVER] only for server errors
+        if (realm == 'SERVER' and not _stringFind(errorText, '%[SERVER%]', 1, true)) then
+            errorText = '[SERVER] ' .. errorText
+        end
+        
         local log = {
             level = 'ERROR',
-            tag = 'RUNTIME',
-            text = err.error,
+            tag = err.type or 'RUNTIME',
+            text = errorText,
             timestamp = err.timestamp,
             time = err.time
         }
-        local hash = _stringFormat('ERROR|RUNTIME|%s', err.error or '')
+        
+        local hash = _stringFormat('ERROR|%s|%s', log.tag, errorText)
         
         if (not groupedLogs[hash]) then
             groupedLogs[hash] = {
