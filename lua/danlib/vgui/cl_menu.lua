@@ -1,336 +1,483 @@
 /***
  *   @addon         DanLib
- *   @version       3.0.0
+ *   @version       2.0.0
  *   @release_date  10/4/2023
  *   @author        denchik
  *   @contact       Discord: denchik_gm
  *                  Steam: https://steamcommunity.com/profiles/76561198405398290/
  *                  GitHub: https://github.com/denchik5133
  *                
- *   @description   Universal library for GMod Lua, combining all the necessary features to simplify script development. 
- *                  Avoid code duplication and speed up the creation process with this powerful and convenient library.
- *
- *   @usage         !danlibmenu (chat) | danlibmenu (console)
+ *   @description   Universal library for GMod Lua
  *   @license       MIT License
- *   @notes         For feature requests or contributions, please open an issue on GitHub.
  */
- 
 
 
-local base = DanLib.Func
-local CookieUtils = DanLib.CookieUtils
-local CustomUtils = DanLib.CustomUtils
-local Table = DanLib.Table
 
--- Constants for UI dimensions
-local DEFAULT_WIDTH = base:GetSize(1000)
-local DEFAULT_HEIGHT = base:GetSize(620)
-local NEWS_SIZE = base:GetSize(300)
+local DBase = DanLib.Func
+local DHook = DanLib.Hook
+local DCookieUtils = DanLib.CookieUtils
+local DCustomUtils = DanLib.CustomUtils.Create
+local DTable = DanLib.Table
 local ui = DanLib.UI
-local utils = DanLib.Utils
+local DUtils = DanLib.Utils
 
+local _IsValid = IsValid
+local _pairs = pairs
+local _ipairs = ipairs
+local _mathMin = math.min
+local _mathMax = math.max
+local _mathClamp = math.Clamp
+local _CurTime = CurTime
+local _osDate = os.date
+local _osTime = os.time
+local _drawSimpleText = draw.SimpleText
 
--- Table to hold news articles
-local News = {}
-local AddNews = {}
+-- Constants
+local CONSTANTS = {
+    WIDTH = DBase:GetSize(1000),
+    HEIGHT = DBase:GetSize(620),
+    NEWS_SIZE = DBase:GetSize(300),
+    SAVE_POPUP_WIDTH = 300,
+    SAVE_POPUP_HEIGHT = 80,
+    ANIM_DURATION = 0.3,
+}
 
+-- Page caching
+local PageCache = {
+    sorted = nil,
+    version = 0
+}
 
--- Fetch news data from a remote source
-DanLib.HTTP:Fetch('https://raw.githubusercontent.com/denchik5133/DDI-Other-Informations/main/DDI/DanLib/news.json', function(data)
-    AddNews = DanLib.NetworkUtil:JSONToTable(data)
-end)
-
-
---- Gets the list of news articles
--- @return table: List of news articles or an empty table
-function News:Get() return AddNews or {} end
-
-
--- Update screen size when the screen size changes
-local function ScreenSizeChanged()
-    DEFAULT_WIDTH = base:GetSize(1000)
-    DEFAULT_HEIGHT = base:GetSize(620)
-    NEWS_SIZE = base:GetSize(300)
+-- Getting a sorted list of pages
+function PageCache:Get()
+    if self.sorted then
+        return self.sorted
+    end
+    
+    self.sorted = {}
+    for _, page in _pairs(DanLib.Pages) do
+        DTable:Add(self.sorted, page)
+    end
+    
+    DTable:Sort(self.sorted, function(a, b)
+        local orderA = a:GetOrder()
+        local orderB = b:GetOrder()
+        if (orderA == orderB) then
+            return a:GetName() < b:GetName()
+        end
+        return orderA < orderB
+    end)
+    
+    return self.sorted
 end
-DanLib.Hook:Add('DDI.PostScreenSizeChanged', 'DDI.ScreenSizeChanged', ScreenSizeChanged)
+
+-- Disabling the cache when adding a new page
+function PageCache:Invalidate()
+    self.sorted = nil
+    self.version = self.version + 1
+end
+
+-- A hook to register a new page
+local originalRegisterPage = DanLib.RegisterPage
+if originalRegisterPage then
+    function DanLib:RegisterPage(page)
+        originalRegisterPage(self, page)
+        PageCache:Invalidate()
+    end
+end
 
 
+local MenuBuilder = {}
 
-DanLib = DanLib or {}
-DanLib.BaseMenu = DanLib.BaseMenu or {}
-
--- Remove existing menu if valid
-if ui:valid(DanLib.MainMenu) then DanLib.MainMenu:Remove() end
-
-
---- Creates the main menu UI
--- @return Panel: The created main menu
-local function base_menu()
-    if ui:valid(DanLib.MainMenu) then DanLib.MainMenu:Remove() end
-    local pPlayer = LocalPlayer()
-
-    -- Create main frame
-    local MainMenu = CustomUtils.Create()
-    DanLib.MainMenu = MainMenu
+-- Creating the main frame
+function MenuBuilder:CreateMainFrame()
+    local MainMenu = DCustomUtils()
     MainMenu:SetPos(0, 0)
-    MainMenu:SetSize(ui:ScrW(), ui:ScrH())
+    MainMenu:SetSize(DanLib.ScrW, DanLib.ScrH)
     MainMenu:MakePopup()
-    MainMenu:SetAlpha(0)
-    MainMenu:AlphaTo(255, 0.2, 0)
+    MainMenu:ApplyAttenuation()
+    MainMenu:ApplyBlur(2, 2)
+    MainMenu:ApplyBackground(Color(14, 22, 33, 180))
+    
+    return MainMenu
+end
 
-    -- Draw background and title
-    MainMenu:ApplyEvent(nil, function(sl, w, h)
-        utils:DrawBlur(sl, 2, 2)
-        utils:DrawRect(0, 0, w, h, Color(14, 22, 33, 180))
-        draw.SimpleText(DanLib.AddonsName, 'danlib_font_20', 10, 10, base:Theme('text'), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-        draw.SimpleText(base:L('#version', { version = DanLib.Version }), 'danlib_font_20', w - 10, 10, base:Theme('text'), TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+-- Creating a menu header
+function MenuBuilder:CreateHeader(parent)
+    local header = DCustomUtils(parent)
+    header:SetTall(30)
+    header:Dock(TOP)
+    local versionText = DBase:L('#version', { version = DanLib.Version })
+    header:ApplyEvent(nil, function(sl, w, h)
+        _drawSimpleText(DanLib.AddonsName, 'danlib_font_20', 10, h * 0.5, DBase:Theme('text'), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        _drawSimpleText(versionText, 'danlib_font_20', w - 10, h * 0.5, DBase:Theme('text'), TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
     end)
+    
+    return header
+end
 
-    -- Seasonal effect
-    if DanLib.USERCONFIG.BASE.ShowParticles then
-        local currentMonth = os.date('!*t', os.time()).month
-        if (currentMonth == 12 or currentMonth == 1 or currentMonth == 2) then
-            base.CreateSnowPanel(MainMenu)
-        else
-            base.CreateLinePanel(MainMenu)
-        end
+--- Creating seasonal effects
+function MenuBuilder:CreateSeasonalEffects(parent)
+    if (not DanLib.USERCONFIG.BASE.ShowParticles) then
+        return
     end
-
-    --- Displays a pop-up for unsaved changes
-    function MainMenu:SavePopout()
-        local Size = 38
-        local Margin = 2
-        local type_icon = DanLib.TYPE['WARNING']
-        local type_color = DanLib.TYPE_COLOR['WARNING']
-        local text = base:L('PlsRememberSaveChanges')
-        local text_w, text_h = utils:GetTextSize(text, 'danlib_font_18')
-        local width = ui:ClampScaleW(self:GetWide(), 200, 300)
-        local height = ui:ClampScaleH(self:GetTall(), 50, 80)
-
-        self.Debug = CustomUtils.Create(MainMenu)
-
-        local pos_x, pos_y = self.Debug:GetPosition('BOTTOM_LEFT', 80)
-        pos_x = pos_x - 50
-        local t = 0.2
-
-        self.Debug:SetPos(pos_x, self:GetTall())
-        self.Debug:SetSize(width, height)
-        self.Debug:SetAlpha(0)
-        self.Debug:AlphaTo(255, t, 0)
-        self.Debug:MoveTo(pos_x, pos_y, t, 0, -10)
-        self.Debug:SetDrawOnTop(true)
-        self.Debug:ApplyEvent(nil, function(sl, w, h)
-            utils:DrawRoundedBox(0, 0, w, h, base:Theme('primary_notifi'))
-            utils:DrawOutlinedRoundedRect(6, 0, 0, w, h, 4, base:Theme('frame'))
-            local squareSize = 64
-            utils:DrawSquareWithIcon(8, (h - squareSize) / 2, base:Theme('secondary_dark'), squareSize, type_icon, 6)
-            local text_x, text_y = squareSize + 24, h / 2
-            utils:DrawDualTextWrap(text_x, text_y, 'WARNING', 'danlib_font_18', type_color, base:L('PlsRememberSaveChanges'), 'danlib_font_18', base:Theme('title'), TEXT_ALIGN_LEFT, nil, 200)
-        end)
-
-        -- Button to confirm navigation
-        local button = base.CreateUIButton(self.Debug, {
-            background = { nil },
-            dock = { FILL },
-            hover = { base:Theme('button_hovered', 50), nil, 8 },
-            hoverClick = { nil },
-            click = function()
-                DanLib.BaseMenu:SetActive(5) -- Configuration page
-                -- base:TutorialSequence(5, 1)
-                -- DanLib.BaseMenu:ToggleMenuVisibility(false)
-            end
-        })
+    
+    local month = _osDate('!*t', _osTime()).month
+    if (month == 12 or month == 1 or month == 2) then
+        DBase.CreateSnowPanel(parent)
+    else
+        DBase.CreateLinePanel(parent)
     end
+end
 
-    --- Closes the save pop-up
-    function MainMenu:CloseSave()
-        self.Debug.Closing = true
-
-        local pos_x, pos_y = self.Debug:GetPosition('BOTTOM_LEFT', 80)
-        pos_x = pos_x - 50
-        local t = 0.2
-
-        self.Debug:SetAlpha(255)
-        self.Debug:AlphaTo(0, t, 0)
-        self.Debug:MoveTo(pos_x, pos_y, t, nil, nil, function()
-            self.Debug:Remove()
-        end)
-    end
-
-    -- Monitor for configuration changes
-    MainMenu:ApplyEvent('Think', function(self)
-        if (DanLib.ChangedConfig and table.Count(DanLib.ChangedConfig) > 0) then
-            if (not ui:valid(self.Debug)) then
-                self:SavePopout()
-            end
-        elseif (ui:valid(self.Debug) and not self.Debug.Closing) then
-            self:CloseSave()
-        end
-    end)
-
-    if base.HasPermission(pPlayer, 'Tutorial') then
-        if (CookieUtils:GetNumber('DanLib.TutorialCompleted', 0) < #DanLib.BaseConfig.Tutorials and not ui:valid(DANLIB_TUTORIAL)) then
-            DANLIB_TUTORIAL = base.CreatePanelTutorial(MainMenu)
-            DANLIB_TUTORIAL:SetPos(50, 100)
-            DANLIB_TUTORIAL:SetTutorial(CookieUtils:GetNumber('DanLib.TutorialCompleted', 0) + 1)
-        end
-    end
-
-    -- Create main container
-    local Container = CustomUtils.Create(MainMenu)
-    Container:SetSize(DEFAULT_WIDTH, DEFAULT_HEIGHT)
+-- Creating the main container
+function MenuBuilder:CreateContainer(parent)
+    local Container = DCustomUtils(parent)
+    Container:SetSize(CONSTANTS.WIDTH, CONSTANTS.HEIGHT)
     Container:Center()
     Container:ApplyEvent(nil, function(sl, w, h)
         DanLib.DrawShadow:Begin()
         local x, y = sl:LocalToScreen(0, 0)
-        utils:DrawRect(x, y, w, h, base:Theme('background'))
+        DUtils:DrawRect(x, y, w, h, DBase:Theme('background'))
         DanLib.DrawShadow:End(1, 1, 1, 255, 0, 0, false)
     end)
     
-    -- Create navigation panel
-    local Navigation = CustomUtils.Create(Container, 'DanLib.UI.Sidenav')
+    return Container
+end
+
+-- Creating a navigation bar
+function MenuBuilder:CreateNavigation(container, mainMenu)
+    local Navigation = DCustomUtils(container, 'DanLib.UI.Sidenav')
     Navigation:Pin(LEFT)
     Navigation:SetWide(50)
-    Navigation.MainMenu = MainMenu
-    Navigation.Container = Container
-    MainMenu.Navigation = Navigation
-
-    -- Create the main content container
-    local container = CustomUtils.Create(Container)
-    container:Pin(FILL, 8)
-    MainMenu.Container = container
-
-    -- Populate pages
-    local pages = {}
-    for _, v in pairs(DanLib.Pages) do
-        pages[#pages + 1] = v
-    end
-
-    -- Sort pages by order
-    Table:Sort(pages, function(a, b)
-        if (a:GetOrder() == b:GetOrder()) then return a:GetName() < b:GetName() end
-        return a:GetOrder() < b:GetOrder()
-    end)
-
-    MainMenu.pages = pages
-    local page_1st
+    Navigation.MainMenu = mainMenu
+    Navigation.Container = container
     
-    -- Create tabs for each page
-    for i, page in ipairs(pages) do
-        -- Access verification
-        -- Skip this tab if the player does not have access
-        if (page.AccessСheck and page:AccessСheck(pPlayer) == false) then continue end
-        page.pnl = Navigation:AddTab(page:GetIcon() or 'error', page:GetName() or '???', function()
-            if (page.OnClick and page:OnClick(MainMenu)) then return end
-            if (MainMenu.activeTab == i) then return end
-            MainMenu.activeTab = i
+    return Navigation
+end
 
-            -- Saving the selected page to a cookie
-            CookieUtils:Set('DanLib.ActivePage', i)
+-- Creating a content area
+function MenuBuilder:CreateContentArea(container)
+    local ContentArea = DCustomUtils(container)
+    ContentArea:Pin(nil, 8)
+    return ContentArea
+end
 
-            for _, child in ipairs(container:GetChildren()) do
-                child:Remove()
+-- Setting up pages and tabs
+function MenuBuilder:SetupPages(mainMenu, navigation, contentArea)
+    local pPlayer = LocalPlayer()
+    local pages = PageCache:Get()
+    
+    mainMenu.pages = pages
+    local firstValidPage = nil
+    
+    for i, page in _ipairs(pages) do
+        -- Creating a tab (creating it for all pages)
+        page.pnl = navigation:AddTab(page:GetIcon() or 'error', page:GetName() or '???', function()
+            -- Calling a custom click handler
+            if (page.OnClick and page:OnClick(mainMenu)) then
+                return
             end
-
-            MainMenu:SetKeyboardInputEnabled(page:GetKeyboardInput())
-            if page.Create then page:Create(container) end
-
-            -- Set the active tab
-            Navigation.activeTab = page.pnl
-            Navigation:UpdateActiveTab()
-            MainMenu:MakePopup()
+            
+            -- Preventing the active tab from opening again
+            if (mainMenu.activeTab == i) then
+                return
+            end
+            
+            self:ActivatePage(mainMenu, navigation, contentArea, page, i)
         end)
-
-        page.pnl:SetVisible(page.AccessСheck == nil or page.AccessСheck(pPlayer) ~= false)
-        page_1st = page_1st or page.pnl
-    end
-
-    -- Opening the last selected page
-    local lastActivePage = CookieUtils:GetNumber('DanLib.ActivePage', 1) -- Defaults to the first page
-    if (lastActivePage <= #pages) then
-        DanLib.BaseMenu:SetActive(lastActivePage)
-    else
-        if page_1st:Valid() then
-            page_1st:Click()
+        
+        -- Checking access for tab visibility
+        local hasAccess = not page.AccessСheck or page:AccessСheck(pPlayer) ~= false
+        page.pnl:SetVisible(hasAccess)
+        
+        -- Memorizing the first available tab
+        if hasAccess then
+            firstValidPage = firstValidPage or page.pnl
         end
     end
+    
+    -- Opening the last active page
+    local lastPageIndex = _mathClamp(DCookieUtils:GetNumber('DanLib.ActivePage', 1), 1, #pages)
+    
+    -- Checking the availability of the saved page
+    if (pages[lastPageIndex] and pages[lastPageIndex].pnl and pages[lastPageIndex].pnl:IsVisible()) then
+        DanLib.BaseMenu:SetActive(lastPageIndex)
+    elseif firstValidPage then
+        if (_IsValid(firstValidPage) and firstValidPage.DoClick) then
+            firstValidPage:DoClick()
+        end
+    end
+end
 
+-- Page activation
+function MenuBuilder:ActivatePage(mainMenu, navigation, contentArea, page, index)
+    mainMenu.activeTab = index
+    
+    -- Saving the selected page
+    DCookieUtils:Set('DanLib.ActivePage', index)
+    
+    -- Cleaning up old content
+    for _, child in _ipairs(contentArea:GetChildren()) do
+        child:Remove()
+    end
+    
+    -- Input Settings
+    mainMenu:SetKeyboardInputEnabled(page:GetKeyboardInput())
+    
+    -- Creating Page Content
+    if page.Create then
+        page:Create(contentArea)
+    end
+    
+    -- Updating the active tab
+    navigation.activeTab = page.pnl
+    navigation:UpdateActiveTab()
+    
+    -- Return of focus
+    mainMenu:MakePopup()
+end
+
+-- Unsaved change notification system
+function MenuBuilder:SetupSaveNotification(mainMenu)
+    local savePopup = nil
+    local isClosing = false
+    local lastConfigHash = nil
+    
+    --- Notification display
+    local function ShowSavePopup()
+        if (_IsValid(savePopup) or isClosing) then
+            return
+        end
+        
+        savePopup = DCustomUtils(mainMenu)
+        
+        local pos_x, pos_y = savePopup:GetPosition('BOTTOM_LEFT', 80)
+        pos_x = pos_x - 50
+        
+        savePopup:SetPos(pos_x, mainMenu:GetTall())
+        savePopup:SetSize(CONSTANTS.SAVE_POPUP_WIDTH, CONSTANTS.SAVE_POPUP_HEIGHT)
+        savePopup:ApplyAttenuation(CONSTANTS.ANIM_DURATION, 255)
+        savePopup:MoveTo(pos_x, pos_y, CONSTANTS.ANIM_DURATION, 0, -10)
+        savePopup:SetDrawOnTop(true)
+        savePopup:ApplyEvent(nil, function(sl, w, h)
+            DUtils:DrawRoundedBox(0, 0, w, h, DBase:Theme('primary_notifi'))
+            DUtils:DrawOutlinedRoundedRect(6, 0, 0, w, h, 4, DBase:Theme('frame'))
+            local squareSize = 64
+            DUtils:DrawSquareWithIcon(8, (h - squareSize) * 0.5, DBase:Theme('secondary_dark'), squareSize, DanLib.TYPE['WARNING'], 6)
+            DUtils:DrawDualTextWrap(squareSize + 24, h * 0.5, 'WARNING', 'danlib_font_18', DanLib.TYPE_COLOR['WARNING'], DBase:L('PlsRememberSaveChanges'), 'danlib_font_18', DBase:Theme('title'), TEXT_ALIGN_LEFT, nil, 200)
+        end)
+        
+        local button = DBase.CreateUIButton(savePopup, {
+            background = false,
+            dock = { FILL },
+            hover = { DBase:Theme('button_hovered', 40), nil, 6 },
+            hoverClick = false,
+            click = function()
+                DanLib.BaseMenu:SetActive(5)
+            end
+        })
+    end
+    
+    -- Hiding the notification
+    local function HideSavePopup()
+        if (not _IsValid(savePopup) or isClosing) then
+            return
+        end
+        
+        isClosing = true
+        
+        local pos_x = savePopup:GetPosition('BOTTOM_LEFT', 80) - 50
+        
+        savePopup:SetAlpha(255)
+        savePopup:AlphaTo(0, CONSTANTS.ANIM_DURATION, 0)
+        savePopup:MoveTo(pos_x, mainMenu:GetTall(), CONSTANTS.ANIM_DURATION, nil, nil, function()
+            if _IsValid(savePopup) then
+                savePopup:Remove()
+                savePopup = nil
+            end
+            isClosing = false
+        end)
+    end
+    
+    -- Checking configuration changes
+    local function _checkConfigChanges()
+        if (not _IsValid(mainMenu)) then
+            return false
+        end
+        
+        -- Checking for changes
+        local hasChanges = DanLib.ChangedConfig and DTable:Count(DanLib.ChangedConfig) > 0
+        if hasChanges then
+            if (not _IsValid(savePopup)) then
+                ShowSavePopup()
+            end
+            return true
+        else
+            if (_IsValid(savePopup) and not isClosing) then
+                HideSavePopup()
+            end
+            return false
+        end
+    end
+    
+    -- Event subscription (priority)
+    DHook:Add('DanLib.ConfigChanged', 'DanLib.Menu.SaveNotification', function()
+        if (not _IsValid(mainMenu)) then
+            DHook:Remove('DanLib.ConfigChanged', 'DanLib.Menu.SaveNotification')
+            return
+        end
+        ShowSavePopup()
+    end)
+    
+    DHook:Add('DanLib.ConfigSaved', 'DanLib.Menu.HideSaveNotification', function()
+        if (not _IsValid(mainMenu)) then
+            DHook:Remove('DanLib.ConfigSaved', 'DanLib.Menu.HideSaveNotification')
+            return
+        end
+        HideSavePopup()
+    end)
+    
+    -- Fallback via optimized Think (only if events don't work)
+    local nextCheck = 0
+    local checkInterval = 0.5 -- We check every 0.5 seconds instead of every frame
+    
+    mainMenu:ApplyEvent('Think', function(sl)
+        local curTime = _CurTime()
+        if (curTime < nextCheck) then
+            return
+        end
+        nextCheck = curTime + checkInterval
+        
+        _checkConfigChanges()
+    end)
+    
+    -- Clearing hooks when deleting menus
+    local originalOnRemove = mainMenu.OnRemove
+    mainMenu.OnRemove = function(sl)
+        DHook:Remove('DanLib.ConfigChanged', 'DanLib.Menu.SaveNotification')
+        DHook:Remove('DanLib.ConfigSaved', 'DanLib.Menu.HideSaveNotification')
+        
+        if _IsValid(savePopup) then
+            savePopup:Remove()
+        end
+        
+        if originalOnRemove then
+            originalOnRemove(sl)
+        end
+    end
+    
+    -- Initial verification
+    _checkConfigChanges()
+end
+
+local function _createBaseMenu()
+    if _IsValid(DanLib.MainMenu) then
+        DanLib.MainMenu:Remove()
+        DanLib.MainMenu = nil
+    end
+    
+    -- Creating the main components
+    local MainMenu = MenuBuilder:CreateMainFrame()
+    DanLib.MainMenu = MainMenu
+    
+    MenuBuilder:CreateHeader(MainMenu)
+    MenuBuilder:CreateSeasonalEffects(MainMenu)
+    
+    local Container = MenuBuilder:CreateContainer(MainMenu)
+    local Navigation = MenuBuilder:CreateNavigation(Container, MainMenu)
+    local ContentArea = MenuBuilder:CreateContentArea(Container)
+
+    -- Linking components
+    MainMenu.Navigation = Navigation
+    MainMenu.Container = ContentArea
+    
+    -- Configuring Functionality
+    MenuBuilder:SetupPages(MainMenu, Navigation, ContentArea)
+    MenuBuilder:SetupSaveNotification(MainMenu)
+
+    -- A SINGLE hook for all modules
+    DBase:TimerSimple(0.1, function()
+        if (not _IsValid(MainMenu)) then
+            return
+        end
+        
+        -- Calling the hook with the menu data
+        hook.Run('DanLib.MainMenu', MainMenu, Navigation, ContentArea)
+    end)
+    
     return MainMenu
 end
 
 
---- Sets the active page based on the specified index.
--- @param index: The index of the page to activate.
+DanLib.BaseMenu = DanLib.BaseMenu or {}
+
+--- Sets the active page by index
+-- @param index (number): Page Index
 function DanLib.BaseMenu:SetActive(index)
     local menu = DanLib.MainMenu
-    if (not ui:valid(menu)) then return end -- Check if the menu exists
-
-    -- Check that the index is within the available pages
-    if (index < 1 or index > #menu.pages) then return end
-
-    -- Set the active tab
-    menu.activeTab = index
-    local Navigation = menu.Navigation
-
-    -- Get a container for pages
-    local container = menu.Container
-    if (not container) then return end
-
-    -- Clean the container of old elements
-    for _, child in ipairs(container:GetChildren()) do
-        -- Do not delete Navigation
-        if (child ~= Navigation) then child:Remove() end
+    if (not _IsValid(menu)) then
+        return
     end
-
-    -- Create a new page
-    if menu.pages[index].Create then
-        menu.pages[index]:Create(container)
+    
+    local pages = menu.pages
+    if (not pages or index < 1 or index > #pages) then
+        return
     end
-
-    -- Update navigation
-    Navigation.activeTab = menu.pages[index].pnl
-    Navigation:UpdateActiveTab()
-    menu:MakePopup() -- Ensure that the menu is active
+    
+    local page = pages[index]
+    if (not page or not _IsValid(page.pnl)) then
+        return
+    end
+    
+    -- Activating the page
+    MenuBuilder:ActivatePage(menu, menu.Navigation, menu.Container, page, index)
 end
 
-
---- Toggles the visibility of the base menu.
+-- Switches the visibility of the menu
 function DanLib.BaseMenu:Toggle()
-    local menu = DanLib.MainMenu
-    if (ui:valid(menu) == false) then
-        menu = base_menu()
-    end
-
-    local pPlayer = LocalPlayer()
-    for _, tab in ipairs(menu.pages) do
-        -- tab.pnl:SetVisible(tab.CustomCheck == nil or tab.CustomCheck(pPlayer) ~= false)
+    if (not _IsValid(DanLib.MainMenu)) then
+        _createBaseMenu()
+    else
+        DanLib.MainMenu:Remove()
+        DanLib.MainMenu = nil
     end
 end
 
-
---- Toggles the visibility of the base menu with initial transparency.
--- @param show boolean: If true, shows the menu; if false, sets it to semi-transparent.
+--- Sets the transparency of the menu
+-- @param show (boolean): Show (true) or hide (false)
 function DanLib.BaseMenu:ToggleMenuVisibility(show)
     local menu = DanLib.MainMenu
-    if (not ui:valid(menu)) then return end -- Check if the menu exists
-
-    local initialTransparency = 80 -- Transparency level on display
-    if show then
-        -- Show menu with initial transparency
-        menu:SetVisible(true)
-        menu:SetAlpha(initialTransparency) -- Set transparency level
-        menu:AlphaTo(255, 0.2, 0) -- Return to full visibility
-    else
-        -- Set menu to semi-transparent state
-        menu:AlphaTo(initialTransparency, 0.2, 0) -- Set transparency level
+    if (not _IsValid(menu)) then
+        return
     end
+    
+    local targetAlpha = show and 255 or 80
+    menu:SetVisible(true)
+    menu:AlphaTo(targetAlpha, CONSTANTS.ANIM_DURATION, 0)
 end
 
-
--- Network handler for opening the base menu
 DanLib.Network:Receive('DanLib:BaseMenu', function()
-    -- DanLib.Protection:SafeExecute(function()
-        DanLib.BaseMenu:Toggle()
-        base:TutorialSequence(1, 1)
-    -- end)
+    DanLib.BaseMenu:Toggle()
+    DBase:TutorialSequence(1, 1)
+end)
+
+-- Updating constants when the resolution changes
+DHook:Add('DDI.PostScreenSizeChanged', 'DanLib.Menu.UpdateConstants', function()
+    CONSTANTS.WIDTH = DBase:GetSize(1000)
+    CONSTANTS.HEIGHT = DBase:GetSize(620)
+    CONSTANTS.NEWS_SIZE = DBase:GetSize(300)
+    
+    -- Recreating the menu when the resolution changes
+    if _IsValid(DanLib.MainMenu) then
+        local wasOpen = true
+        local activeTab = DanLib.MainMenu.activeTab
+        
+        DanLib.MainMenu:Remove()
+        _createBaseMenu()
+        
+        if activeTab then
+            DanLib.BaseMenu:SetActive(activeTab)
+        end
+    end
 end)
