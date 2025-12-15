@@ -349,7 +349,7 @@ end
 -- @param err (string)
 -- @param stack (string)
 function DEBUG:CatchError(err, stack)
-    if (not self:IsEnabled()) then
+    if not self:IsEnabled() then
         return
     end
     
@@ -363,13 +363,14 @@ function DEBUG:CatchError(err, stack)
     
     _tableInsert(self.errors, errorEntry)
     
-    if (#self.errors > self.maxErrors) then
+    if #self.errors > self.maxErrors then
         _tableRemove(self.errors, 1)
     end
     
     self:Log(err, 'ERROR', 'RUNTIME')
     
-    if SERVER then
+    -- Broadcast ТОЛЬКО серверные ошибки!
+    if SERVER and errorEntry.realm == 'SERVER' then
         self:BroadcastError(errorEntry)
     end
 end
@@ -708,34 +709,49 @@ if CLIENT then
         end
     end
 
-    --- Global Lua Error Interceptor
-    _timerSimple(1, function()
+    --- Global Lua Error Interceptor (БЕЗ timer.Simple!)
+    _hookAdd('OnLuaError', 'DanLib.Debug.GlobalError', function(err, realm, stack, name, id)
+        -- Checking the IsEnabled()
         if (not DEBUG:IsEnabled()) then
             return
         end
         
-        _hookAdd('OnLuaError', 'DanLib.Debug.GlobalError', function(err, realm, stack, name, id)
-            -- Forming a message
-            local fullError = err
-            if (name and name ~= '') then
-                fullError = _stringFormat('%s (in %s)', err, name)
-            end
-            
-            -- Checking the filters
-            if DEBUG:ShouldCatchError(fullError) then
-                -- Adding it to the log with the [PARSE] tag
-                local errorType = _stringFind(err, 'expected') and 'PARSE' or 'RUNTIME'
-                DEBUG:Log(_stringFormat('[%s] %s', errorType, fullError), 'ERROR', 'LUA')
-                -- Adding to errors
-                _tableInsert(DEBUG.errors, {
-                    error = fullError,
-                    stack = stack or '',
-                    time = _CurTime(),
-                    timestamp = _osDate('%H:%M:%S'),
-                    type = errorType
-                })
-            end
-        end)
+        -- Forming a message
+        local fullError = err
+        if (name and name ~= '') then
+            fullError = _stringFormat('%s (in %s)', err, name)
+        end
+        
+        -- Checking the filters
+        if (not DEBUG:ShouldCatchError(fullError)) then
+            return
+        end
+        
+        -- Determining the type of error
+        local errorType = _stringFind(err, 'expected') and 'PARSE' or 'RUNTIME'
+        
+        -- Adding it to DEBUG.errors
+        _tableInsert(DEBUG.errors, {
+            error = fullError,
+            stack = stack or '',
+            time = _CurTime(),
+            timestamp = _osDate('%H:%M:%S'),
+            type = errorType,
+            realm = 'CLIENT'
+        })
+        
+        -- Checking the limit
+        if (#DEBUG.errors > DEBUG.maxErrors) then
+            _tableRemove(DEBUG.errors, 1)
+        end
+        
+        -- Logging in
+        DEBUG:Log(_stringFormat('[%s] %s', errorType, fullError), 'ERROR', 'LUA')
+        
+        -- Updating the UI
+        if DEBUG.RefreshLogs then
+            DEBUG:RefreshLogs()
+        end
     end)
 end
 
@@ -782,7 +798,7 @@ function DEBUG:ExportLogs(filepath, includeErrors, format)
         local lines = {}
         local separator = _stringRep('=', 80)
         
-        -- Заголовок
+        -- Heading
         _tableInsert(lines, separator)
         _tableInsert(lines, _stringFormat('DanLib Debug Export - %s', _osDate('%Y-%m-%d %H:%M:%S')))
         _tableInsert(lines, _stringFormat('Realm: %s', SERVER and 'SERVER' or 'CLIENT'))
