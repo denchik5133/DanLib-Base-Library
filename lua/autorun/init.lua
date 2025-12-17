@@ -1,6 +1,6 @@
 /***
  *   @addon         DanLib
- *   @version       3.0.0
+ *   @version       3.2.0
  *   @release_date  10/4/2023
  *   @author        denchik
  *   @contact       Discord: denchik_gm
@@ -17,7 +17,12 @@
  
 
 
-DanLib_AddonsName, DanLib_Version, DanLib_Author, DanLib_Key = 'DanLib Basic Library', '3.0.0', '76561198405398290', '' 
+DanLib_AddonsName = 'DanLib Basic Library'
+DanLib_Version = '3.2.0'
+DanLib_Author = '76561198405398290'
+DanLib_Key = 'DanLib-8f3A5c2E-9d1B7e4A-6c8F2b5D'
+DanLib_ReleaseDate = '10/4/2023'
+DanLib_License = 'MIT'
 
 -- Create a Variables/Tables workspace table.
 DanLib = DanLib or {}
@@ -41,7 +46,8 @@ DanLib = {
     Permissions = {},
     Logs = {},
     FileUtil = {},
-    NetworkUtil = {}
+    NetworkUtil = {},
+    DEBUG = {}
 }
 DanLibUI = DanLibUI or {}
 
@@ -52,7 +58,6 @@ DDI = {
     Utils = {},
     Temp = {}
 }
-
 
 --- Defines the available data types for the configuration.
 -- @table DanLib.Type: A table containing the main data types used in the project.
@@ -68,7 +73,6 @@ DanLib.Type = {
     Table = 'Table',
     Key = 'Key'
 }
-
 
 local function loadingFunctionType()
     --- Defines functions for working with data types.
@@ -104,7 +108,6 @@ local function loadingFunctionType()
     }
 end
 
-
 AddCSLuaFile()
 
 if (CLIENT) then
@@ -133,124 +136,68 @@ end
 include('danlib/sh_init.lua')
 
 
-local function FancyPrint()
-    local fancy = [[
-       /\_/\  
-      ( o.o ) 
-       > ^ <
-    [*] Version: ]] .. DanLib.Version .. '\n'
-
-    MsgC(Color(255, 165, 0), fancy)
-end
-
--- print(file.IsDir('danlib/core/sqlite', 'LUA'))
-
+-- DanLib Initialization Script
+-- Loads all core modules and components in the correct order
 local function Start()
-    local BASE = DanLib.Func.CreateLoader()
-    BASE:SetName('DanLib')
-    BASE:SetStartsLoading()
-    BASE:SetLoadDirectory('danlib')
-    -- Loading a network library (new catalogue)
-    BASE:IncludeDir('core/network') -- Uploading all files in the network directory
+    local loader = DanLib.Func.CreateLoader({
+        githubName = 'DanLib Basic Library',
+        version = '3.2.0',
+        Key = DanLib_Key,
+        license = DanLib_License
+    })
+
+    loader:SetName('DanLib')
+    loader:SetLoadDirectory('danlib')
+    loader:SetStartsLoading()
+
+    -- Network layer (must be loaded first)
+    loader:IncludeDir('core/network')
     loadingFunctionType()
-    BASE:IncludeDir('core/ui_components')
-    -- Configuration download
-    BASE:IncludeDir('core/config') -- Load all files in the config directory
-    -- Uploading metadata
-    BASE:IncludeDir('core/meta') -- Upload all files in the meta directory
-    -- Downloading files from netstream with some files ignored
-    -- BASE:IncludeDir('core/netstream', true, {
-    --    ['sh_pon.lua'] = false,        -- Ignore this file (will not be downloaded)
-    --    ['sh_nw.lua'] = false,          -- Enable this file (will be downloaded)
-    --    ['sh_netstream.lua'] = false,   -- Enable this file (will be downloaded)
-    --})
-    -- Upload all files from the shared directory
-    BASE:IncludeDir('shared') -- Upload all files in the shared directory
-    -- Downloading utilities
-    BASE:IncludeDir('core/utils') -- Load all files in the utilities directory
-    -- Loading auxiliary functions and elements
-    BASE:IncludeDir('core/shared') -- Upload all files in the shared directory
-    -- Downloading the language files
+    -- Base UI components
+    loader:IncludeDir('core/ui_components')
+
+    -- Configuration system
+    loader:IncludeDir('core/config')
+    -- Metadata definitions
+    loader:IncludeDir('core/meta')
+
+    -- Shared utilities
+    loader:IncludeDir('shared')
+    loader:IncludeDir('core/shared')
+    loader:IncludeDir('core/utils')
+
+    -- Localization
     DanLib.Func.LoadLanguages()
-    -- Downloading themes for the interface
+    -- UI themes
     DanLib.Func.LoadThemes()
-    -- Uploading gamemodes
+
+    -- Client utilities
+    loader:IncludeDir('core/client')
+    -- Menu pages
+    loader:IncludeDir('core/pages')
+    -- HUD elements
+    loader:IncludeDir('core/hud_elements')
+    -- VGUI elements
+    loader:IncludeDir('vgui')
+    -- Server utilities
+    loader:IncludeDir('core/server')
+    -- Database layer
+    loader:IncludeDir('core/sqlite')
+
+    -- Gamemode integration
     DanLib.Func.LoadGamemodes()
-    -- Uploading chat commands
+    -- Chat commands
     DanLib.Func.LoadCommands()
-    -- Uploading client files
-    BASE:IncludeDir('core/client') -- Upload all files in the client file directories
-    -- Loading the main menu pages
-    BASE:IncludeDir('core/pages') -- Upload all files to the menu page directories
-    -- Loading the main hud
-    BASE:IncludeDir('core/hud_elements') -- Upload all files to the hud directories
-    -- Loading user interface elements
-    BASE:IncludeDir('vgui') -- Download all files in the vgui directory
-    -- Uploading server files
-    if SERVER then
-        BASE:IncludeDir('core/server') -- Upload all files to the server file directories
-        -- Downloading SQLite
-        BASE:IncludeDir('core/sqlite') -- Upload all files in the mysqlite directory
-    end
-    -- Downloading the logs
+    -- Logging system
     DanLib.Func.LoadLogs()
-    FancyPrint()
-    -- Finish downloading and registering all modules
-    BASE:Register()
+
+    -- Register
+    loader:Register()
 end
 Start()
 
 DanLib.Loading = DanLib.Loading or {}
 DanLib.Loading.Start = Start
-
-
-
-local WORKSHOP_VERSION = CreateConVar('danlib_version_warnings', '1', FCVAR_ARCHIVE, 'Should we warn users if Base is outdated')
-local workshop_id = '2418668622'
-local is_workshop = nil
-local colors = {
-    [1] = Color(255, 140, 0),
-    [2] = Color(0, 255, 0),
-    [3] = color_white
-}
-
-function DanLib.Func:VersionWorkshopCheck()
-    if (is_workshop ~= nil) then return is_workshop end
-
-    for _, v in ipairs(engine.GetAddons()) do
-        if (v.wsid == workshop_id) then
-            is_workshop = true
-            return true
-        end
-    end
-
-    is_workshop = false
-    return false
-end
-
-local function NewVersion()
-    if (not WORKSHOP_VERSION:GetBool()) then return end
-
-    DanLib.Func:TimerSimple(5, function()
-        if DanLib.Func:VersionWorkshopCheck() then
-            DanLib.Func:Print('Running workshop version')
-            return
-        end
-
-        DanLib.HTTP:Fetch('https://raw.githubusercontent.com/denchik5133/DDI-Other-Informations/main/DDI/update.json', function(body)
-            local data = DanLib.NetworkUtil:JSONToTable(body)[DanLib_AddonsName]
-            if (data ~= DanLib_Version) then
-                if CLIENT then
-                    chat.AddText(colors[1], '< ', colors[3], 'DanLib', colors[1], ' > ', colors[3], 'Current version: ', colors[1], DanLib_Version, colors[3], '. Need to upgrade to ', colors[2], data, colors[3], ' version. \n','See DanLib menu for details. In the help section.')
-                else
-                    MsgC(colors[1], '< ', colors[3], 'DanLib', colors[1], ' > ', colors[3], 'Current version: ', colors[1],  DanLib_Version, colors[3], '. Need to upgrade to ', colors[2], data, colors[3], ' version. \n','See DanLib menu for details. In the help section.')
-                end
-            end
-        end)
-    end)
-end
-NewVersion()
-
 
 -- Downloading materials from Steam.
 local function AddContent(WorkshopID)
